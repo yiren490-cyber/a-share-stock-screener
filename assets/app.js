@@ -606,6 +606,10 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
     return location.hostname.endsWith("github.io");
   }
 
+  function preferEastmoneyKline() {
+    return IS_MOBILE || isGithubPages();
+  }
+
   function jsonp(url, varName) {
     return new Promise((resolve, reject) => {
       const script = document.createElement("script");
@@ -707,7 +711,7 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
   }
 
   async function requestEastmoneyKline(symbol, period) {
-    if (location.protocol === "http:" || location.protocol === "https:") {
+    if ((location.protocol === "http:" || location.protocol === "https:") && !isGithubPages()) {
       const proxyUrl = `/api/eastmoney-kline?${new URLSearchParams({ symbol, period }).toString()}`;
       const response = await fetch(proxyUrl);
       if (response.ok) {
@@ -776,6 +780,12 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
     if (state.klineCache.has(cacheKey)) return state.klineCache.get(cacheKey);
     let rows = [];
     if ((location.protocol === "http:" || location.protocol === "https:") && !isGithubPages()) {
+      try {
+        rows = applyRealtimeQuoteToRows(symbol, await retryAsync(() => requestEastmoneyKline(symbol, period)), period === "day");
+      } catch (_) {
+        rows = [];
+      }
+    } else if (preferEastmoneyKline() && !["5", "30", "60", "120"].includes(period)) {
       try {
         rows = applyRealtimeQuoteToRows(symbol, await retryAsync(() => requestEastmoneyKline(symbol, period)), period === "day");
       } catch (_) {
@@ -1497,7 +1507,8 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
     let completed = 0;
     let lastPublished = 0;
     els.runIndicatorScreenButton.disabled = true;
-    els.indicatorScreenStatus.textContent = `开始运行：${plan.name}，共 ${base.length} 只股票。`;
+    const workerCount = Math.min(IS_MOBILE ? 6 : 10, Math.max(1, base.length));
+    els.indicatorScreenStatus.textContent = `开始运行：${plan.name}，共 ${base.length} 只股票，并发 ${workerCount}，K线源：${preferEastmoneyKline() ? "东方财富优先" : "本地代理优先"}。`;
     state.filtered = [];
     state.currentPage = 1;
     renderQuoteTable();
@@ -1510,7 +1521,6 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
       sortFiltered();
       renderQuoteTable();
     };
-    const workerCount = Math.min(IS_MOBILE ? 3 : 10, Math.max(1, base.length));
     const workers = Array.from({ length: workerCount }, async (_, workerIndex) => {
       for (let index = workerIndex; index < base.length; index += workerCount) {
         if (state.indicatorRunToken !== runToken) return;
@@ -1535,7 +1545,6 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
           els.indicatorScreenStatus.textContent = `运行中 ${completed}/${base.length}，已在列表显示命中 ${matches.length} 只，K线失败 ${failed}`;
           await new Promise((resolve) => setTimeout(resolve, 0));
         }
-        if (IS_MOBILE) await sleep(120);
       }
     });
     await Promise.all(workers);
