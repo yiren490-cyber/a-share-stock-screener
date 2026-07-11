@@ -2,6 +2,10 @@
   const QUOTE_URL = "https://qt.gtimg.cn/q=";
   const EASTMONEY_LIST_URL = "https://48.push2.eastmoney.com/api/qt/clist/get";
   const DAY_KLINE_URL = "https://web.ifzq.gtimg.cn/appstock/app/fqkline/get";
+  const TENCENT_KLINE_URLS = [
+    "https://web.ifzq.gtimg.cn/appstock/app/fqkline/get",
+    "https://ifzq.gtimg.cn/appstock/app/fqkline/get",
+  ];
   const MIN_KLINE_URL = "https://web.ifzq.gtimg.cn/appstock/app/kline/mkline";
   const TODAY = new Date();
   const IS_MOBILE = typeof navigator !== "undefined" && /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || "");
@@ -688,14 +692,28 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
     return normalizeKlineRows((data && data[key]) || []);
   }
 
-  async function requestPeriodKlineJsonp(symbol, period, qfq, count = 520) {
+  async function requestPeriodKlineJsonp(symbol, period, qfq, count = 520, endpoint = DAY_KLINE_URL) {
     const varName = `tq_kline_${symbol}_${period}_${qfq ? "qfq" : "plain"}_${Date.now()}_${Math.round(Math.random() * 100000)}`;
     const param = qfq ? `${symbol},${period},,,${count},qfq` : `${symbol},${period},,,${count}`;
-    const url = `${DAY_KLINE_URL}?${new URLSearchParams({ _var: varName, param }).toString()}`;
+    const url = `${endpoint}?${new URLSearchParams({ _var: varName, param }).toString()}`;
     const payload = await jsonp(url, varName);
     const data = payload.data && payload.data[symbol];
     const key = qfq ? `qfq${period}` : period;
     return normalizeKlineRows((data && (data[key] || data[period])) || []);
+  }
+
+  async function requestTencentAdjustedKline(symbol, period) {
+    let lastError = null;
+    for (const endpoint of TENCENT_KLINE_URLS) {
+      try {
+        const rows = await retryAsync(() => requestPeriodKlineJsonp(symbol, period, true, 520, endpoint), 2);
+        if (rows.length) return rows;
+      } catch (error) {
+        lastError = error;
+      }
+    }
+    if (lastError) throw lastError;
+    return [];
   }
 
   function eastmoneySecid(symbol) {
@@ -779,14 +797,17 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
     const cacheKey = `${symbol}:${period}`;
     if (state.klineCache.has(cacheKey)) return state.klineCache.get(cacheKey);
     let rows = [];
+    let triedEastmoney = false;
     if ((location.protocol === "http:" || location.protocol === "https:") && !isGithubPages()) {
       try {
+        triedEastmoney = true;
         rows = applyRealtimeQuoteToRows(symbol, await retryAsync(() => requestEastmoneyKline(symbol, period)), period === "day");
       } catch (_) {
         rows = [];
       }
     } else if (preferEastmoneyKline() && !["5", "30", "60", "120"].includes(period)) {
       try {
+        triedEastmoney = true;
         rows = applyRealtimeQuoteToRows(symbol, await retryAsync(() => requestEastmoneyKline(symbol, period)), period === "day");
       } catch (_) {
         rows = [];
@@ -797,18 +818,14 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
         // Prefer the local proxy result when available.
       } else if (["5", "30", "60", "120"].includes(period)) {
         rows = applyRealtimeQuoteToRows(symbol, await retryAsync(() => requestMinuteKline(symbol, period)), false);
-      } else if (period === "week" || period === "month") {
-        rows = await retryAsync(() => requestPeriodKlineJsonp(symbol, period, false));
-        if (!rows.length) rows = await retryAsync(() => requestPeriodKlineJsonp(symbol, period, true));
       } else {
-        rows = await retryAsync(() => requestPeriodKlineJsonp(symbol, "day", false));
-        if (!rows.length) rows = await retryAsync(() => requestPeriodKlineJsonp(symbol, "day", true));
-        rows = applyRealtimeQuoteToRows(symbol, rows, true);
+        rows = await requestTencentAdjustedKline(symbol, period === "week" || period === "month" ? period : "day");
+        if (period === "day") rows = applyRealtimeQuoteToRows(symbol, rows, true);
       }
     } catch (_) {
       rows = [];
     }
-    if (!rows.length) {
+    if (!rows.length && !triedEastmoney) {
       rows = applyRealtimeQuoteToRows(symbol, await retryAsync(() => requestEastmoneyKline(symbol, period)), period === "day");
     }
     if (!rows.length) throw new Error(`无${period}K线数据`);
