@@ -773,24 +773,7 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
 
   async function fetchKline(symbol) {
     const period = els.periodSelect.value;
-    if (["5", "30", "60", "120"].includes(period)) return applyRealtimeQuoteToRows(symbol, await requestMinuteKline(symbol, period), false);
-    if (period === "week" || period === "month") {
-      const qfq = await requestPeriodKline(symbol, period, true);
-      const qfqRows = qfq.data && qfq.data[symbol] && (qfq.data[symbol][`qfq${period}`] || qfq.data[symbol][period]);
-      if (qfqRows && qfqRows.length >= 30) return normalizeKlineRows(qfqRows);
-      const plain = await requestPeriodKline(symbol, period, false);
-      const rows = plain.data && plain.data[symbol] && plain.data[symbol][period];
-      return normalizeKlineRows(rows || []);
-    }
-
-    const plain = await requestDayKline(symbol, false);
-    const rows = plain.data && plain.data[symbol] && plain.data[symbol].day;
-    if (rows && rows.length >= 30) return applyRealtimeQuoteToRows(symbol, normalizeKlineRows(rows), true);
-
-    const qfq = await requestDayKline(symbol, true);
-    const qfqRows = qfq.data && qfq.data[symbol] && (qfq.data[symbol].qfqday || qfq.data[symbol].day);
-    if (qfqRows && qfqRows.length >= 30) return applyRealtimeQuoteToRows(symbol, normalizeKlineRows(qfqRows), true);
-    return applyRealtimeQuoteToRows(symbol, normalizeKlineRows(rows || qfqRows || []), true);
+    return fetchKlineForPeriod(symbol, period);
   }
 
   async function fetchKlineForPeriod(symbol, period) {
@@ -850,16 +833,11 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
     if (state.indexKlineCache.has(cacheKey)) return state.indexKlineCache.get(cacheKey);
     let rows = [];
     if (["5", "30", "60", "120"].includes(period)) {
-      rows = await requestMinuteKline(symbol, period);
+      rows = await retryAsync(() => requestMinuteKline(symbol, period));
       state.indexKlineCache.set(cacheKey, rows);
       return rows;
     }
-    if (period === "week" || period === "month") {
-      rows = await requestPeriodKlineJsonp(symbol, period, false);
-      state.indexKlineCache.set(cacheKey, rows);
-      return rows;
-    }
-    rows = await requestPeriodKlineJsonp(symbol, "day", false);
+    rows = await requestTencentAdjustedKline(symbol, period === "week" || period === "month" ? period : "day");
     state.indexKlineCache.set(cacheKey, rows);
     return rows;
   }
@@ -881,19 +859,8 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
   }
 
   async function fetchIndexKlineForQuote(quote) {
-    let symbol = "sh000001";
-    if (quote.type === "创业板") symbol = "sz399006";
-    if (quote.type === "深市主板") symbol = "sz399001";
     const period = els.periodSelect.value;
-    if (["5", "30", "60", "120"].includes(period)) return requestMinuteKline(symbol, period);
-    if (period === "week" || period === "month") {
-      const payload = await requestPeriodKline(symbol, period, false);
-      const rows = payload.data && payload.data[symbol] && payload.data[symbol][period];
-      return normalizeKlineRows(rows || []);
-    }
-    const payload = await requestDayKline(symbol, false);
-    const rows = payload.data && payload.data[symbol] && payload.data[symbol].day;
-    return normalizeKlineRows(rows || []);
+    return fetchIndexKlineForQuotePeriod(quote, period);
   }
 
   function readCriteria() {
