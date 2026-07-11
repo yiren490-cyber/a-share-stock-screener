@@ -383,9 +383,11 @@ details p {
 }
 
 .pager button {
+  width: 32px;
   height: 30px;
-  padding: 0 9px;
-  font-size: 12px;
+  padding: 0;
+  font-size: 13px;
+  line-height: 1;
 }
 
 #pageInfo {
