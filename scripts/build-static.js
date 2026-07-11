@@ -85,7 +85,8 @@ async function proxyKline(url) {
 function serveAsset(pathname) {
   const body = ASSETS[pathname];
   if (body == null) return null;
-  return response(body, 200, { "Content-Type": MIME[extname(pathname)] || "text/plain; charset=utf-8" });
+  const type = pathname === "/" ? MIME[".html"] : MIME[extname(pathname)] || "text/plain; charset=utf-8";
+  return response(body, 200, { "Content-Type": type });
 }
 
 export default {
