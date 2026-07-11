@@ -671,7 +671,8 @@ tbody tr.selected {
   position: sticky;
   top: 10px;
   max-height: calc(100vh - 20px);
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
   min-width: 0;
   padding: 14px;
 }
@@ -691,10 +692,17 @@ tbody tr.selected {
 
 .chart-controls {
   display: grid;
-  grid-template-columns: minmax(75px, 0.8fr) minmax(75px, 0.75fr) 72px 70px 168px 140px;
-  gap: 8px;
+  grid-template-columns: 1.35fr 1.15fr 0.78fr 0.78fr 1.35fr 1.25fr;
+  width: 100%;
+  max-width: 100%;
+  gap: 6px;
   margin-bottom: 14px;
   align-items: end;
+  overflow: hidden;
+}
+
+.chart-controls > * {
+  min-width: 0;
 }
 
 .chart-controls.main-no-ma > label:first-child {
@@ -811,6 +819,7 @@ tbody tr.selected {
   display: flex;
   gap: 6px;
   min-width: 0;
+  width: 100%;
 }
 
 .indicator-imports {
@@ -818,17 +827,19 @@ tbody tr.selected {
   flex-wrap: nowrap;
   gap: 4px;
   min-width: 0;
+  width: 100%;
 }
 
 .zoom-actions button {
-  width: 52px;
+  flex: 1 1 0;
+  min-width: 42px;
   padding: 0;
   font-size: 12px;
 }
 
 .indicator-imports button {
-  flex: 1 1 66px;
-  min-width: 66px;
+  flex: 1 1 0;
+  min-width: 0;
   padding: 0 5px;
   font-size: 12px;
   white-space: nowrap;
