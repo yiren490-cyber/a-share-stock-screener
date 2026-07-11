@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>A股实时筛选器</title>
+    <link rel="stylesheet" href="assets/styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="toolbar">
+        <div>
+          <h1>A股实时筛选器</h1>
+          <p id="statusText">等待拉取行情。当前版本使用腾讯行情接口和全市场股票池。</p>
+        </div>
+        <div class="toolbar-actions">
+          <button id="refreshButton" type="button">刷新行情</button>
+          <button id="downloadButton" type="button" disabled>导出结果</button>
+        </div>
+      </section>
+
+      <section class="filters" aria-label="筛选条件">
+        <label>
+          <span class="filter-title">股票名称/代码</span>
+          <input id="keywordFilter" type="search" placeholder="000001 或 平安" />
+        </label>
+        <div class="filter-field">
+          <span class="field-title">股票类型</span>
+          <div class="multi-select" id="typeFilter">
+            <button class="multi-select-button" id="typeFilterButton" type="button">全部类型</button>
+            <div class="multi-select-menu" id="typeFilterMenu">
+              <label><input type="checkbox" value="沪市主板" />沪市主板</label>
+              <label><input type="checkbox" value="深市主板" />深市主板</label>
+              <label><input type="checkbox" value="创业板" />创业板</label>
+              <label><input type="checkbox" value="科创板" />科创板</label>
+              <label><input type="checkbox" value="北交所" />北交所</label>
+              <label><input type="checkbox" value="__non_st" />非ST</label>
+            </div>
+          </div>
+        </div>
+        <label>
+          <span class="filter-title">上市天数</span>
+          <span class="range-inputs"><input id="minListingDays" type="number" step="1" placeholder="最小" /><input id="maxListingDays" type="number" step="1" placeholder="最大" /></span>
+        </label>
+        <label>
+          <span class="filter-title">流通市值/亿元</span>
+          <span class="range-inputs"><input id="minFloatMarketCapYi" type="number" step="1" placeholder="最小" /><input id="maxFloatMarketCapYi" type="number" step="1" placeholder="最大" /></span>
+        </label>
+        <label>
+          <span class="filter-title">涨跌幅/%</span>
+          <span class="range-inputs"><input id="minPctChange" type="number" step="0.01" placeholder="最小" /><input id="maxPctChange" type="number" step="0.01" placeholder="最大" /></span>
+        </label>
+        <label>
+          <span class="filter-title">成交额/亿元</span>
+          <span class="range-inputs"><input id="minTurnoverYi" type="number" step="0.1" placeholder="最小" /><input id="maxTurnoverYi" type="number" step="0.1" placeholder="最大" /></span>
+        </label>
+        <label>
+          <span class="filter-title">换手率/%</span>
+          <span class="range-inputs"><input id="minTurnoverRate" type="number" step="0.01" placeholder="最小" /><input id="maxTurnoverRate" type="number" step="0.01" placeholder="最大" /></span>
+        </label>
+        <label>
+          <span class="filter-title">量比</span>
+          <span class="range-inputs"><input id="minVolumeRatio" type="number" step="0.01" placeholder="最小" /><input id="maxVolumeRatio" type="number" step="0.01" placeholder="最大" /></span>
+        </label>
+      </section>
+
+      <section class="summary" aria-label="筛选结果概览">
+        <div>
+          <span>行情总数</span>
+          <strong id="totalCount">0</strong>
+        </div>
+        <div>
+          <span>符合条件</span>
+          <strong id="filteredCount">0</strong>
+        </div>
+        <div>
+          <span>最高涨幅</span>
+          <strong id="topPctChange">--</strong>
+        </div>
+        <div>
+          <span>数据源</span>
+          <strong id="sourceName">腾讯</strong>
+        </div>
+      </section>
+
+      <section class="indicator-screener is-collapsed" id="indicatorScreener" aria-label="指标筛选">
+        <div class="screener-header">
+          <div>
+            <h2>指标筛选</h2>
+            <p id="indicatorScreenStatus">填写的条件会全部满足后才命中。</p>
+          </div>
+          <div class="screener-actions">
+            <button id="toggleIndicatorScreenerButton" type="button">展开</button>
+            <button id="loadDefaultIndicatorPlanButton" type="button">填入测试条件</button>
+            <button id="addIndicatorConditionButton" type="button">添加条件</button>
+            <button id="saveIndicatorPlanButton" type="button">保存方案</button>
+            <button id="runIndicatorScreenButton" type="button">运行筛选</button>
+          </div>
+        </div>
+        <div class="screener-body">
+          <div class="screener-form">
+            <label>
+              条件名
+              <input id="indicatorPlanName" type="text" placeholder="例如：BOLL短买+主力共振" />
+            </label>
+            <label>
+              已保存方案
+              <select id="indicatorPlanSelect"></select>
+            </label>
+            <button id="deleteIndicatorPlanButton" type="button">删除方案</button>
+          </div>
+          <div class="condition-list" id="indicatorConditionList"></div>
+        </div>
+      </section>
+
+      <section class="content-grid">
+        <section class="table-wrap" aria-label="股票列表">
+          <div class="table-toolbar">
+            <div class="category-tools">
+              <button id="toggleCategoryModeButton" type="button">收藏股票</button>
+              <select id="categorySelect" aria-label="股票分类"></select>
+              <button id="manageCategoryButton" type="button">管理分组</button>
+              <button id="confirmFavoriteButton" type="button">确认收藏</button>
+              <button id="selectPageButton" type="button">全选本页</button>
+              <button id="clearCategoryButton" type="button">全部股票</button>
+            </div>
+            <div class="page-size-control">
+              <span>每页</span>
+              <select id="pageSizeSelect" aria-label="每页展示数量">
+                <option value="10">10</option>
+                <option value="20" selected>20</option>
+                <option value="30">30</option>
+                <option value="50">50</option>
+              </select>
+              <span>条</span>
+            </div>
+            <div class="pager">
+              <button id="prevPageButton" type="button">上一页</button>
+              <span id="pageInfo">1 / 1</span>
+              <button id="nextPageButton" type="button">下一页</button>
+            </div>
+            <button id="columnSettingsButton" type="button">列设置</button>
+            <div class="column-settings-menu" id="columnSettingsMenu"></div>
+          </div>
+          <div class="table-scroll">
+            <table>
+              <thead id="quoteHead"></thead>
+              <tbody id="quoteRows">
+                <tr>
+                  <td colspan="10" class="empty">点击"刷新行情"开始获取 A 股实时数据</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="detail-panel" aria-label="股票主副图">
+          <div class="detail-header">
+            <div>
+              <h2 id="detailTitle">选择一只股票</h2>
+              <p id="detailMeta"></p>
+            </div>
+          </div>
+          <div class="chart-controls">
+            <label>
+              主图指标
+              <select id="mainIndicatorSelect">
+                <option value="ma" selected>均线</option>
+                <option value="boll">BOLL线</option>
+                <option value="boll-ma">BOLL均线结合</option>
+                <option value="boll-short">BOLL短买结合</option>
+                <option value="custom-main">自定义主图指标</option>
+              </select>
+            </label>
+            <div class="filter-field">
+              <span class="field-title">选择均线</span>
+              <div class="multi-select" id="maPeriodsInput">
+                <button class="multi-select-button" id="maPeriodsButton" type="button">MA5，MA10</button>
+                <div class="multi-select-menu">
+                  <label><input type="checkbox" value="5" checked />MA5</label>
+                  <label><input type="checkbox" value="10" checked />MA10</label>
+                  <label><input type="checkbox" value="17" />MA17</label>
+                  <label><input type="checkbox" value="20" />MA20</label>
+                  <label><input type="checkbox" value="30" />MA30</label>
+                  <label><input type="checkbox" value="60" />MA60</label>
+                  <label><input type="checkbox" value="120" />MA120</label>
+                  <label><input type="checkbox" value="250" />MA250</label>
+                </div>
+              </div>
+            </div>
+            <label>
+              K线周期
+              <select id="periodSelect">
+                <option value="5">5分钟</option>
+                <option value="30">30分钟</option>
+                <option value="60">60分钟</option>
+                <option value="120">120分钟</option>
+                <option value="day" selected>日K</option>
+                <option value="week">周K</option>
+                <option value="month">月K</option>
+              </select>
+            </label>
+            <label>
+              副图数量
+              <select id="subChartCountSelect">
+                <option value="1">1 个</option>
+                <option value="2">2 个</option>
+                <option value="3">3 个</option>
+                <option value="4">4 个</option>
+                <option value="5" selected>5 个</option>
+              </select>
+            </label>
+            <div class="zoom-actions">
+              <button id="zoomOutButton" type="button">缩小</button>
+              <button id="zoomInButton" type="button">放大</button>
+              <button id="zoomResetButton" type="button">重置</button>
+            </div>
+            <div class="indicator-imports">
+              <button id="importMainIndicatorButton" type="button">导入主图</button>
+              <button id="importSubIndicatorButton" type="button">导入副图</button>
+              <input id="mainIndicatorFile" type="file" accept=".txt" hidden />
+              <input id="subIndicatorFile" type="file" accept=".txt" hidden />
+            </div>
+          </div>
+          <div class="chart-card">
+            <h3 id="mainChartTitle">主图</h3>
+            <div class="chart-info" id="mainChartInfo"></div>
+            <svg id="mainChart" viewBox="0 0 700 260" role="img" aria-label="主图"></svg>
+          </div>
+          <div id="subCharts"></div>
+        </section>
+      </section>
+    </main>
+
+    <div class="modal-backdrop" id="categoryModal" hidden>
+      <div class="category-modal" role="dialog" aria-modal="true" aria-label="保存到分组">
+        <div class="modal-header">
+          <h3>保存到分组</h3>
+          <button id="closeCategoryModalButton" type="button">关闭</button>
+        </div>
+        <div class="modal-body">
+          <label>
+            选择已有分组
+            <select id="saveCategorySelect" aria-label="保存到已有分组"></select>
+          </label>
+          <div class="new-category-row">
+            <button id="showNewCategoryButton" type="button">添加分组</button>
+            <input id="categoryNameInput" type="text" placeholder="填写分组名" />
+            <button id="createCategoryButton" type="button">保存</button>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button id="saveCategoryButton" type="button">确认保存</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-backdrop" id="manageCategoryModal" hidden>
+      <div class="category-modal" role="dialog" aria-modal="true" aria-label="管理分组">
+        <div class="modal-header">
+          <h3>管理分组</h3>
+          <button id="closeManageCategoryButton" type="button">关闭</button>
+        </div>
+        <div class="modal-body">
+          <div class="manage-category-list" id="manageCategoryList"></div>
+          <div class="new-category-row is-adding">
+            <button id="addManagedCategoryButton" type="button">新增分组</button>
+            <input id="managedCategoryNameInput" type="text" placeholder="填写分组名" />
+            <button id="saveManagedCategoryButton" type="button">保存</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="assets/listing-dates.js"></script>
+    <script src="assets/app.js"></script>
+  </body>
+</html>
