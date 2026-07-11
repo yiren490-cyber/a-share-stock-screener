@@ -226,21 +226,32 @@ details p {
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
+  min-width: 0;
+}
+
+.screener-header > div:first-child {
+  min-width: 0;
 }
 
 .screener-actions {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   justify-content: flex-end;
-  gap: 8px;
+  gap: 6px;
+  min-width: 0;
 }
 
 .screener-actions button,
 .screener-form button,
 .condition-row button {
   height: 32px;
-  padding: 0 9px;
+  padding: 0 8px;
   font-size: 12px;
+}
+
+.screener-actions button {
+  flex: 0 1 auto;
+  white-space: nowrap;
 }
 
 .screener-form {
