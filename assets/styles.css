@@ -839,6 +839,9 @@ tbody tr.selected {
   gap: 4px;
   min-width: 0;
   width: 100%;
+  height: 36px;
+  overflow: hidden;
+  align-items: stretch;
 }
 
 .zoom-actions button {
@@ -849,10 +852,19 @@ tbody tr.selected {
 }
 
 .indicator-imports button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   flex: 1 1 0;
   min-width: 0;
+  width: 0;
+  height: 36px;
   padding: 0 5px;
   font-size: 12px;
+  line-height: 1;
+  overflow: hidden;
+  text-align: center;
+  text-overflow: clip;
   white-space: nowrap;
 }
 
