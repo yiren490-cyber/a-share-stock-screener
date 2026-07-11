@@ -8,6 +8,7 @@ fs.rmSync(dist, { recursive: true, force: true });
 fs.mkdirSync(dist, { recursive: true });
 
 function copyRecursive(source, target) {
+  if (source.endsWith(".backup")) return;
   const stat = fs.statSync(source);
   if (stat.isDirectory()) {
     fs.mkdirSync(target, { recursive: true });
@@ -21,16 +22,23 @@ copyRecursive(path.join(root, "index.html"), path.join(dist, "index.html"));
 copyRecursive(path.join(root, "assets"), path.join(dist, "assets"));
 copyRecursive(path.join(root, ".openai"), path.join(dist, ".openai"));
 
+const deployAssets = {};
+function addDeployAsset(urlPath, filePath) {
+  deployAssets[urlPath] = fs.readFileSync(filePath, "utf8");
+}
+addDeployAsset("/", path.join(root, "index.html"));
+addDeployAsset("/index.html", path.join(root, "index.html"));
+fs.readdirSync(path.join(root, "assets")).forEach((entry) => {
+  if (entry.endsWith(".backup")) return;
+  const filePath = path.join(root, "assets", entry);
+  if (fs.statSync(filePath).isFile()) addDeployAsset(`/assets/${entry}`, filePath);
+});
+
 const serverDir = path.join(dist, "server");
 fs.mkdirSync(serverDir, { recursive: true });
 fs.writeFileSync(
   path.join(serverDir, "index.js"),
-  `const http = require("http");
-const fs = require("fs");
-const path = require("path");
-
-const ROOT = path.resolve(__dirname, "..");
-const PORT = Number(process.env.PORT || 8787);
+  `const ASSETS = ${JSON.stringify(deployAssets)};
 const MIME = {
   ".html": "text/html; charset=utf-8",
   ".js": "application/javascript; charset=utf-8",
@@ -39,9 +47,19 @@ const MIME = {
   ".svg": "image/svg+xml",
 };
 
-function send(res, status, body, headers = {}) {
-  res.writeHead(status, { "Access-Control-Allow-Origin": "*", ...headers });
-  res.end(body);
+function extname(pathname) {
+  const index = pathname.lastIndexOf(".");
+  return index >= 0 ? pathname.slice(index) : "";
+}
+
+function response(body, status = 200, headers = {}) {
+  return new Response(body, {
+    status,
+    headers: {
+      "Access-Control-Allow-Origin": "*",
+      ...headers,
+    },
+  });
 }
 
 function eastmoneySecid(symbol) {
@@ -56,11 +74,11 @@ function eastmoneyKlt(period) {
   return period;
 }
 
-async function proxyKline(req, res, url) {
+async function proxyKline(url) {
   const symbol = String(url.searchParams.get("symbol") || "");
   const period = String(url.searchParams.get("period") || "day");
   if (!/^(sh|sz|bj)\\d{6}$/.test(symbol)) {
-    return send(res, 400, JSON.stringify({ error: "bad symbol" }), { "Content-Type": MIME[".json"] });
+    return response(JSON.stringify({ error: "bad symbol" }), 400, { "Content-Type": MIME[".json"] });
   }
   const upstream = \`https://push2his.eastmoney.com/api/qt/stock/kline/get?\${new URLSearchParams({
     secid: eastmoneySecid(symbol),
@@ -73,36 +91,33 @@ async function proxyKline(req, res, url) {
     lmt: "520",
   }).toString()}\`;
   try {
-    const response = await fetch(upstream);
-    const text = await response.text();
-    send(res, response.ok ? 200 : response.status, text, { "Content-Type": MIME[".json"] });
+    const upstreamResponse = await fetch(upstream, {
+      headers: {
+        "User-Agent": "Mozilla/5.0",
+        "Referer": "https://quote.eastmoney.com/",
+      },
+    });
+    const text = await upstreamResponse.text();
+    return response(text, upstreamResponse.ok ? 200 : upstreamResponse.status, { "Content-Type": MIME[".json"] });
   } catch (error) {
     const message = error && error.message ? error.message : String(error);
-    send(res, 502, JSON.stringify({ error: message }), { "Content-Type": MIME[".json"] });
+    return response(JSON.stringify({ error: message }), 502, { "Content-Type": MIME[".json"] });
   }
 }
 
-function serveStatic(req, res, url) {
-  const pathname = decodeURIComponent(url.pathname === "/" ? "/index.html" : url.pathname);
-  const filePath = path.resolve(ROOT, \`.\${pathname}\`);
-  if (!filePath.startsWith(ROOT)) {
-    return send(res, 403, "Forbidden", { "Content-Type": "text/plain; charset=utf-8" });
-  }
-  fs.readFile(filePath, (error, content) => {
-    if (error) return send(res, 404, "Not found", { "Content-Type": "text/plain; charset=utf-8" });
-    send(res, 200, content, { "Content-Type": MIME[path.extname(filePath)] || "application/octet-stream" });
-  });
+function serveAsset(pathname) {
+  const body = ASSETS[pathname];
+  if (body == null) return null;
+  return response(body, 200, { "Content-Type": MIME[extname(pathname)] || "text/plain; charset=utf-8" });
 }
 
-http
-  .createServer((req, res) => {
-    const url = new URL(req.url, \`http://\${req.headers.host}\`);
-    if (url.pathname === "/api/eastmoney-kline") return proxyKline(req, res, url);
-    return serveStatic(req, res, url);
-  })
-  .listen(PORT, "0.0.0.0", () => {
-    console.log(\`Stock app started on port \${PORT}\`);
-  });
+export default {
+  async fetch(request) {
+    const url = new URL(request.url);
+    if (url.pathname === "/api/eastmoney-kline") return proxyKline(url);
+    return serveAsset(url.pathname) || response("Not found", 404, { "Content-Type": "text/plain; charset=utf-8" });
+  },
+};
 `,
   "utf8"
 );
