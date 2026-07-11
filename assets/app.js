@@ -1,9 +1,10 @@
 (function () {
   const QUOTE_URL = "https://qt.gtimg.cn/q=";
-  const EASTMONEY_LIST_URL = "http://48.push2.eastmoney.com/api/qt/clist/get";
+  const EASTMONEY_LIST_URL = "https://48.push2.eastmoney.com/api/qt/clist/get";
   const DAY_KLINE_URL = "https://web.ifzq.gtimg.cn/appstock/app/fqkline/get";
   const MIN_KLINE_URL = "https://web.ifzq.gtimg.cn/appstock/app/kline/mkline";
   const TODAY = new Date();
+  const IS_MOBILE = typeof navigator !== "undefined" && /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || "");
   const STATIC_LISTING_DATES = window.A_SHARE_LISTING_DATES || {};
   const DEFAULT_POOL = [
     ["sh600000", "1999-11-10"],
@@ -517,18 +518,25 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
 
   async function fetchQuotes() {
     const result = [];
-    for (let index = 0; index < state.stockPool.length; index += 500) {
-      const symbols = state.stockPool.slice(index, index + 500).map((item) => item.symbol).join(",");
-      const response = await fetch(`${QUOTE_URL}${symbols}`);
-      if (!response.ok) throw new Error(`腾讯行情接口返回 ${response.status}`);
-      const buffer = await response.arrayBuffer();
-      const text = new TextDecoder("gbk").decode(buffer);
+    const batchSize = IS_MOBILE ? 300 : 500;
+    for (let index = 0; index < state.stockPool.length; index += batchSize) {
+      const symbols = state.stockPool.slice(index, index + batchSize).map((item) => item.symbol).join(",");
+      const text = await retryAsync(async () => {
+        const response = await fetch(`${QUOTE_URL}${symbols}`);
+        if (!response.ok) throw new Error(`腾讯行情接口返回 ${response.status}`);
+        const buffer = await response.arrayBuffer();
+        return new TextDecoder("gbk").decode(buffer);
+      }, 2, IS_MOBILE ? 900 : 300);
       result.push(
         ...text
           .split(/\n+/)
           .map((line) => parseTencentQuote(line.trim()))
           .filter(Boolean)
       );
+      if (IS_MOBILE) {
+        els.statusText.textContent = `正在分批拉取实时行情：${Math.min(index + batchSize, state.stockPool.length)}/${state.stockPool.length}`;
+        await sleep(120);
+      }
     }
     return result;
   }
@@ -590,6 +598,14 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
     return /^\d{4}-\d{2}-\d{2}$/.test(date || "") ? date : "";
   }
 
+  function sleep(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  function isGithubPages() {
+    return location.hostname.endsWith("github.io");
+  }
+
   function jsonp(url, varName) {
     return new Promise((resolve, reject) => {
       const script = document.createElement("script");
@@ -597,7 +613,7 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
       const timer = setTimeout(() => {
         cleanup();
         reject(new Error("接口请求超时"));
-      }, 12000);
+      }, IS_MOBILE ? 20000 : 12000);
       const cleanup = () => {
         clearTimeout(timer);
         script.remove();
@@ -618,10 +634,23 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
       };
       script.onerror = () => {
         cleanup();
-        reject(new Error("分钟K线接口加载失败"));
+        reject(new Error("K线接口加载失败"));
       };
       document.head.appendChild(script);
     });
+  }
+
+  async function retryAsync(task, attempts = 2, delayMs = IS_MOBILE ? 650 : 250) {
+    let lastError = null;
+    for (let attempt = 1; attempt <= attempts; attempt += 1) {
+      try {
+        return await task();
+      } catch (error) {
+        lastError = error;
+        if (attempt < attempts) await sleep(delayMs * attempt);
+      }
+    }
+    throw lastError;
   }
 
   function mergeRows(rows, size) {
@@ -746,9 +775,9 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
     const cacheKey = `${symbol}:${period}`;
     if (state.klineCache.has(cacheKey)) return state.klineCache.get(cacheKey);
     let rows = [];
-    if (location.protocol === "http:" || location.protocol === "https:") {
+    if ((location.protocol === "http:" || location.protocol === "https:") && !isGithubPages()) {
       try {
-        rows = applyRealtimeQuoteToRows(symbol, await requestEastmoneyKline(symbol, period), period === "day");
+        rows = applyRealtimeQuoteToRows(symbol, await retryAsync(() => requestEastmoneyKline(symbol, period)), period === "day");
       } catch (_) {
         rows = [];
       }
@@ -757,20 +786,20 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
       if (rows.length) {
         // Prefer the local proxy result when available.
       } else if (["5", "30", "60", "120"].includes(period)) {
-        rows = applyRealtimeQuoteToRows(symbol, await requestMinuteKline(symbol, period), false);
+        rows = applyRealtimeQuoteToRows(symbol, await retryAsync(() => requestMinuteKline(symbol, period)), false);
       } else if (period === "week" || period === "month") {
-        rows = await requestPeriodKlineJsonp(symbol, period, false);
-        if (!rows.length) rows = await requestPeriodKlineJsonp(symbol, period, true);
+        rows = await retryAsync(() => requestPeriodKlineJsonp(symbol, period, false));
+        if (!rows.length) rows = await retryAsync(() => requestPeriodKlineJsonp(symbol, period, true));
       } else {
-        rows = await requestPeriodKlineJsonp(symbol, "day", false);
-        if (!rows.length) rows = await requestPeriodKlineJsonp(symbol, "day", true);
+        rows = await retryAsync(() => requestPeriodKlineJsonp(symbol, "day", false));
+        if (!rows.length) rows = await retryAsync(() => requestPeriodKlineJsonp(symbol, "day", true));
         rows = applyRealtimeQuoteToRows(symbol, rows, true);
       }
     } catch (_) {
       rows = [];
     }
     if (!rows.length) {
-      rows = applyRealtimeQuoteToRows(symbol, await requestEastmoneyKline(symbol, period), period === "day");
+      rows = applyRealtimeQuoteToRows(symbol, await retryAsync(() => requestEastmoneyKline(symbol, period)), period === "day");
     }
     if (!rows.length) throw new Error(`无${period}K线数据`);
     const quote = state.quotes.find((item) => item.symbol === symbol);
@@ -1481,7 +1510,7 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
       sortFiltered();
       renderQuoteTable();
     };
-    const workerCount = Math.min(24, Math.max(1, base.length));
+    const workerCount = Math.min(IS_MOBILE ? 3 : 10, Math.max(1, base.length));
     const workers = Array.from({ length: workerCount }, async (_, workerIndex) => {
       for (let index = workerIndex; index < base.length; index += workerCount) {
         if (state.indicatorRunToken !== runToken) return;
@@ -1506,6 +1535,7 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
           els.indicatorScreenStatus.textContent = `运行中 ${completed}/${base.length}，已在列表显示命中 ${matches.length} 只，K线失败 ${failed}`;
           await new Promise((resolve) => setTimeout(resolve, 0));
         }
+        if (IS_MOBILE) await sleep(120);
       }
     });
     await Promise.all(workers);
