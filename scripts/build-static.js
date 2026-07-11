@@ -76,33 +76,10 @@ function eastmoneyKlt(period) {
 
 async function proxyKline(url) {
   const symbol = String(url.searchParams.get("symbol") || "");
-  const period = String(url.searchParams.get("period") || "day");
   if (!/^(sh|sz|bj)\\d{6}$/.test(symbol)) {
     return response(JSON.stringify({ error: "bad symbol" }), 400, { "Content-Type": MIME[".json"] });
   }
-  const upstream = \`https://push2his.eastmoney.com/api/qt/stock/kline/get?\${new URLSearchParams({
-    secid: eastmoneySecid(symbol),
-    fields1: "f1,f2,f3,f4,f5,f6",
-    fields2: "f51,f52,f53,f54,f55,f56,f57",
-    klt: eastmoneyKlt(period),
-    fqt: "0",
-    beg: "19900101",
-    end: "20500101",
-    lmt: "520",
-  }).toString()}\`;
-  try {
-    const upstreamResponse = await fetch(upstream, {
-      headers: {
-        "User-Agent": "Mozilla/5.0",
-        "Referer": "https://quote.eastmoney.com/",
-      },
-    });
-    const text = await upstreamResponse.text();
-    return response(text, upstreamResponse.ok ? 200 : upstreamResponse.status, { "Content-Type": MIME[".json"] });
-  } catch (error) {
-    const message = error && error.message ? error.message : String(error);
-    return response(JSON.stringify({ error: message }), 502, { "Content-Type": MIME[".json"] });
-  }
+  return response(JSON.stringify({ error: "production proxy disabled; use browser JSONP fallback" }), 502, { "Content-Type": MIME[".json"] });
 }
 
 function serveAsset(pathname) {
