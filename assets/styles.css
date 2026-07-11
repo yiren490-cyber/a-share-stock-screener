@@ -705,7 +705,7 @@ tbody tr.selected {
 
 .chart-controls {
   display: grid;
-  grid-template-columns: minmax(86px, 1fr) minmax(86px, 1fr) minmax(62px, 0.68fr) minmax(62px, 0.68fr) minmax(126px, 1.18fr) minmax(78px, 0.82fr) minmax(78px, 0.82fr);
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1.05fr) minmax(0, 0.8fr) minmax(0, 0.8fr);
   width: 100%;
   max-width: 100%;
   gap: 6px;
@@ -831,8 +831,10 @@ tbody tr.selected {
 .zoom-actions {
   display: flex;
   gap: 6px;
+  grid-column: span 2;
   min-width: 0;
   width: 100%;
+  height: 32px;
 }
 
 .indicator-imports {
@@ -842,14 +844,15 @@ tbody tr.selected {
   gap: 6px;
   min-width: 0;
   width: 100%;
-  height: 36px;
+  height: 32px;
   overflow: hidden;
   align-items: stretch;
 }
 
 .zoom-actions button {
   flex: 1 1 0;
-  min-width: 42px;
+  min-width: 0;
+  height: 32px;
   padding: 0;
   font-size: 12px;
 }
@@ -859,8 +862,8 @@ tbody tr.selected {
   align-items: center;
   justify-content: center;
   flex: 1 1 0;
-  min-width: 72px;
-  height: 36px;
+  min-width: 0;
+  height: 32px;
   padding: 0 8px;
   font-size: 12px;
   line-height: 1;
