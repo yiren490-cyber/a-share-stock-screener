@@ -332,6 +332,14 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
     return Math.max(0, Math.floor((TODAY - start) / 86400000));
   }
 
+  function normalizeListingDate(value) {
+    const text = String(value || "").trim();
+    const dashed = text.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (dashed) return text;
+    const compact = text.match(/^(\d{4})(\d{2})(\d{2})$/);
+    return compact ? `${compact[1]}-${compact[2]}-${compact[3]}` : "";
+  }
+
   function parseTencentQuote(line) {
     const match = line.match(/^v_([a-z]{2}\d{6})="(.*)";?$/);
     if (!match) return null;
@@ -428,7 +436,8 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
             ...diff
               .map((item) => {
                 const symbol = eastmoneySymbol(item);
-                return { symbol, listingDate: /^\d{4}-\d{2}-\d{2}$/.test(item.f26 || "") ? item.f26 : (symbol ? state.listingDateCache[symbol] || STATIC_LISTING_DATES[symbol] || "" : "") };
+                const listingDate = normalizeListingDate(item.f26) || (symbol ? state.listingDateCache[symbol] || STATIC_LISTING_DATES[symbol] || "" : "");
+                return { symbol, listingDate };
               })
               .filter((item) => item.symbol)
           );
@@ -465,7 +474,7 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
         ...rows
           .map((item) => ({
             symbol: item.SECURITY_CODE_A ? `sh${item.SECURITY_CODE_A}` : "",
-            listingDate: /^\d{4}-\d{2}-\d{2}$/.test(item.LISTING_DATE || "") ? item.LISTING_DATE : "",
+            listingDate: normalizeListingDate(item.LISTING_DATE),
           }))
           .filter((item) => item.symbol)
       );
@@ -500,7 +509,7 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
     const payload = await response.json();
     const rows = payload && payload[0] && payload[0].data ? payload[0].data : [];
     rows.forEach((item) => {
-      if (/^\d{6}$/.test(item.zqdm || "")) result.push({ symbol: `sz${item.zqdm}`, listingDate: state.listingDateCache[`sz${item.zqdm}`] || "" });
+      if (/^\d{6}$/.test(item.zqdm || "")) result.push({ symbol: `sz${item.zqdm}`, listingDate: normalizeListingDate(item.agssrq) || state.listingDateCache[`sz${item.zqdm}`] || "" });
     });
     return result;
   }
@@ -599,7 +608,7 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
     if (!response.ok) return "";
     const payload = await response.json();
     const date = payload && payload.data && payload.data.agssrq;
-    return /^\d{4}-\d{2}-\d{2}$/.test(date || "") ? date : "";
+    return normalizeListingDate(date);
   }
 
   function sleep(ms) {
@@ -875,7 +884,6 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
       excludedTypes: [
         selectedTypes.includes("__exclude_chinext") ? "创业板" : "",
         selectedTypes.includes("__exclude_star") ? "科创板" : "",
-        selectedTypes.includes("__exclude_bse") ? "北交所" : "",
       ].filter(Boolean),
       nonSt: selectedTypes.includes("__non_st"),
       minListingDays: toNumber(els.filters.minListingDays.value),
@@ -898,7 +906,6 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
       __non_st: "非ST",
       __exclude_chinext: "非创业板",
       __exclude_star: "非科创板",
-      __exclude_bse: "非北交所",
     };
     const selected = Array.from(els.filters.type.querySelectorAll("input:checked")).map((input) => labelMap[input.value] || input.value);
     els.typeFilterButton.textContent = selected.length ? selected.join("，") : "全部类型";
@@ -1721,6 +1728,7 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
       <option value="boll">BOLL线</option>
       <option value="boll-ma">BOLL均线结合</option>
       <option value="boll-short">BOLL短买结合</option>
+      ${state.importedMainIndicators.map((item, index) => `<option value="custom-main-${index}">${item.name}</option>`).join("")}
     `;
     if (Array.from(els.mainIndicatorSelect.options).some((option) => option.value === currentMain)) {
       els.mainIndicatorSelect.value = currentMain;
@@ -2531,7 +2539,71 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
 
   function currentMainIndicator() {
     const value = els.mainIndicatorSelect.value;
+    if (value.startsWith("custom-main-")) {
+      const index = Number(value.replace("custom-main-", ""));
+      const item = state.importedMainIndicators[index];
+      return { type: value, label: item ? item.name : "导入主图", item };
+    }
     return { type: value, label: value === "boll" ? "BOLL线" : value === "boll-ma" ? "BOLL均线结合" : value === "boll-short" ? "BOLL短买结合" : "均线" };
+  }
+
+  function finiteFormulaValues(outputs) {
+    return outputs.flatMap((output) => output.value.filter((value) => value !== null && value !== undefined && Number.isFinite(value)));
+  }
+
+  function renderImportedMainChart(allRows, mainIndicator) {
+    const rows = visibleRows(allRows);
+    const offset = allRows.length - rows.length;
+    const w = 700;
+    const h = 260;
+    const pad = { left: 46, right: 18, top: 20, bottom: 26 };
+    const x = (index) => chartX(index, rows, pad, w);
+    const candleW = Math.max(3, (w - pad.left - pad.right) / rows.length - 2);
+    els.mainChartTitle.textContent = "主图";
+    let outputs = [];
+    try {
+      outputs = executeFormula(mainIndicator.item.source || "", allRows, state.selectedIndexRows || [], state.selected).outputs;
+    } catch (error) {
+      els.mainChart.setAttribute("viewBox", `0 0 ${w} ${h}`);
+      els.mainChart.innerHTML = `<rect width="${w}" height="${h}" fill="#ffffff" /><text x="24" y="48" fill="#dc2626" font-size="13">${mainIndicator.label} 公式暂无法解析：${String(error.message || error).slice(0, 80)}</text>`;
+      els.mainChartInfo.innerHTML = `${mainIndicator.label} 公式暂无法解析`;
+      return;
+    }
+    const visibleOutputs = outputs.map((output) => ({ ...output, value: output.value.slice(offset) })).filter((output) => output.value.some((value) => Number.isFinite(value)));
+    const formulaValues = finiteFormulaValues(visibleOutputs);
+    const scaleRows = rows.map((row) => ({ high: row.high, low: row.low }));
+    const high = Math.max(...scaleRows.map((row) => row.high), ...formulaValues);
+    const low = Math.min(...scaleRows.map((row) => row.low), ...formulaValues);
+    const { max, min, y } = priceScale([{ high, low }], pad, h);
+    const candles = rows
+      .map((row, index) => {
+        const cx = x(index);
+        const up = row.close >= row.open;
+        const color = up ? "#d93025" : "#0f9d58";
+        const bodyY = Math.min(y(row.open), y(row.close));
+        const bodyH = Math.max(1, Math.abs(y(row.open) - y(row.close)));
+        return `<line x1="${cx}" y1="${y(row.high)}" x2="${cx}" y2="${y(row.low)}" stroke="${color}" stroke-width="1" /><rect x="${cx - candleW / 2}" y="${bodyY}" width="${candleW}" height="${bodyH}" fill="${up ? "transparent" : color}" stroke="${color}" stroke-width="1" />`;
+      })
+      .join("");
+    const formulaLines = visibleOutputs.map((output) => svgSeriesLine(output.value, x, y, output.color || "#1d4ed8", 1.4)).join("");
+    els.mainChart.setAttribute("viewBox", `0 0 ${w} ${h}`);
+    els.mainChart.innerHTML = `<rect width="${w}" height="${h}" fill="#ffffff" />
+      <line x1="${pad.left}" y1="${pad.top}" x2="${pad.left}" y2="${h - pad.bottom}" stroke="#dfe5ec" />
+      <line x1="${pad.left}" y1="${h - pad.bottom}" x2="${w - pad.right}" y2="${h - pad.bottom}" stroke="#dfe5ec" />
+      ${candles}${formulaLines}
+      <text x="8" y="${pad.top + 10}" fill="#667788" font-size="11">${max.toFixed(2)}</text>
+      <text x="8" y="${h - pad.bottom}" fill="#667788" font-size="11">${min.toFixed(2)}</text>
+      ${crosshairLayer(pad, w, h)}`;
+    bindChart(els.mainChart, {
+      w,
+      h,
+      pad,
+      rows,
+      x,
+      infoNode: els.mainChartInfo,
+      crossY: (index) => y(rows[index].close),
+      info: (row, index) => [`${row.date} 开:${row.open.toFixed(2)} 高:${row.high.toFixed(2)} 低:${row.low.toFixed(2)} 收:${row.close.toFixed(2)}`, visibleOutputs.map((output) => colorLabel(output.name, formatNumber(output.value[index]), output.color || "#1d4ed8")).join(" ")],
+    });
   }
 
   function renderMainChart(allRows) {
@@ -2544,6 +2616,10 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
     const colors = ["#1d4ed8", "#f59e0b", "#7c3aed", "#0891b2", "#64748b", "#db2777", "#16a34a", "#ea580c"];
     const maMap = new Map(periods.map((period) => [period, movingAverage(allRows, period, "close").slice(offset)]));
     const mainIndicator = currentMainIndicator();
+    if (mainIndicator.item) {
+      renderImportedMainChart(allRows, mainIndicator);
+      return;
+    }
     const bollRows = calculateBoll(allRows).slice(offset);
     const shortMaPeriods = [5, 17, 60];
     const shortMaMap = new Map(shortMaPeriods.map((period) => [period, movingAverage(allRows, period, "close").slice(offset)]));
@@ -2939,6 +3015,7 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
 
   function renderImportedSubChart(svg, allRows, type, infoNode) {
     const rows = visibleRows(allRows);
+    const offset = allRows.length - rows.length;
     const index = Number(type.replace("custom-sub-", ""));
     const item = state.importedSubIndicators[index];
     if (item && item.kind === "main-force") {
@@ -2949,11 +3026,53 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
     const h = 108;
     const pad = { left: 46, right: 18, top: 14, bottom: 22 };
     const x = (rowIndex) => chartX(rowIndex, rows, pad, w);
+    let outputs = [];
+    try {
+      outputs = executeFormula((item && item.source) || "", allRows, state.selectedIndexRows || [], state.selected).outputs;
+    } catch (error) {
+      svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+      svg.innerHTML = `<rect width="${w}" height="${h}" fill="#ffffff" /><text x="${pad.left}" y="34" fill="#dc2626" font-size="12">${item ? item.name : "自定义副图"} 公式暂无法解析：${String(error.message || error).slice(0, 70)}</text>${crosshairLayer(pad, w, h)}`;
+      bindChart(svg, {
+        w,
+        h,
+        pad,
+        rows,
+        x,
+        infoNode,
+        crossY: () => h - pad.bottom,
+        info: (row) => [`${row.date}  ${item ? item.name : "自定义副图"} 公式暂无法解析`],
+      });
+      return;
+    }
+    const visibleOutputs = outputs.map((output) => ({ ...output, value: output.value.slice(offset) })).filter((output) => output.value.some((value) => Number.isFinite(value)));
+    if (visibleOutputs.length) {
+      const values = finiteFormulaValues(visibleOutputs);
+      const max = Math.max(...values, 1);
+      const min = Math.min(...values, 0);
+      const range = max === min ? 1 : max - min;
+      const y = (value) => pad.top + ((max - value) / range) * (h - pad.top - pad.bottom);
+      svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+      svg.innerHTML = `<rect width="${w}" height="${h}" fill="#ffffff" />
+        <line x1="${pad.left}" y1="${h - pad.bottom}" x2="${w - pad.right}" y2="${h - pad.bottom}" stroke="#dfe5ec" />
+        ${visibleOutputs.map((output) => svgSeriesLine(output.value, x, y, output.color || "#1d4ed8", 1.4)).join("")}
+        ${crosshairLayer(pad, w, h)}`;
+      bindChart(svg, {
+        w,
+        h,
+        pad,
+        rows,
+        x,
+        infoNode,
+        crossY: (rowIndex) => y(visibleOutputs[0].value[rowIndex] || 0),
+        info: (row, rowIndex) => [`${row.date} ${visibleOutputs.map((output) => colorLabel(output.name, formatNumber(output.value[rowIndex]), output.color || "#1d4ed8")).join(" ")}`],
+      });
+      return;
+    }
     svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
     svg.innerHTML = `
       <rect width="${w}" height="${h}" fill="#ffffff" />
       <line x1="${pad.left}" y1="${h - pad.bottom}" x2="${w - pad.right}" y2="${h - pad.bottom}" stroke="#dfe5ec" />
-      <text x="${pad.left}" y="34" fill="#667788" font-size="12">${item ? item.name : "自定义副图"} 已导入，等待公式解释器适配</text>
+      <text x="${pad.left}" y="34" fill="#667788" font-size="12">${item ? item.name : "自定义副图"} 已导入，但公式没有可绘制输出</text>
       ${crosshairLayer(pad, w, h)}
     `;
     bindChart(svg, {
@@ -3177,13 +3296,8 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
         state.importedMainIndicators.push(item);
         localStorage.setItem("aShareMainIndicators", JSON.stringify(state.importedMainIndicators));
         refreshIndicatorOptions();
-        if (Array.from(els.mainIndicatorSelect.options).some((option) => option.value === item.kind)) {
-          els.mainIndicatorSelect.value = item.kind;
-          els.statusText.textContent = `已导入主图指标：${item.name}`;
-        } else {
-          els.mainIndicatorSelect.value = "ma";
-          els.statusText.textContent = `已保存主图指标：${item.name}，当前暂不支持直接显示该公式。`;
-        }
+        els.mainIndicatorSelect.value = `custom-main-${state.importedMainIndicators.length - 1}`;
+        els.statusText.textContent = `已导入主图指标：${item.name}`;
         updateMainControlVisibility();
       } else {
         state.importedSubIndicators.push(item);
