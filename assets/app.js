@@ -320,7 +320,7 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
     const code = symbol.slice(2);
     if (symbol.startsWith("bj")) return "北交所";
     if (symbol.startsWith("sh") && code.startsWith("688")) return "科创板";
-    if (symbol.startsWith("sz") && code.startsWith("300")) return "创业板";
+    if (symbol.startsWith("sz") && (code.startsWith("300") || code.startsWith("301"))) return "创业板";
     if (symbol.startsWith("sz")) return "深市主板";
     return "沪市主板";
   }

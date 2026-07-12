@@ -72,9 +72,45 @@ sandbox.window.localStorage = sandbox.localStorage;
 vm.createContext(sandbox);
 vm.runInContext(appSource, sandbox);
 
-const { evaluateIndicatorPlan } = sandbox.window.aShareAnalyzer;
+const { evaluateIndicatorPlan, parseTencentQuote, quoteMatches } = sandbox.window.aShareAnalyzer;
 
 assert.strictEqual(typeof evaluateIndicatorPlan, "function", "evaluateIndicatorPlan should be exported");
+assert.strictEqual(typeof parseTencentQuote, "function", "parseTencentQuote should be exported");
+assert.strictEqual(typeof quoteMatches, "function", "quoteMatches should be exported");
+
+function quoteLine(symbol, name, code) {
+  const fields = Array.from({ length: 50 }, () => "");
+  fields[1] = name;
+  fields[2] = code;
+  fields[3] = "10.00";
+  fields[30] = "202607101500";
+  return `v_${symbol}="${fields.join("~")}";`;
+}
+
+const chinext301 = parseTencentQuote(quoteLine("sz301001", "凯淳股份", "301001"));
+assert.strictEqual(chinext301.type, "创业板", "301-prefixed SZ stocks should be 创业板");
+assert.strictEqual(
+  quoteMatches(chinext301, {
+    keyword: "",
+    types: ["深市主板"],
+    excludedTypes: ["创业板"],
+    nonSt: false,
+    minListingDays: null,
+    maxListingDays: null,
+    minFloatMarketCap: null,
+    maxFloatMarketCap: null,
+    minPctChange: null,
+    maxPctChange: null,
+    minTurnover: null,
+    maxTurnover: null,
+    minTurnoverRate: null,
+    maxTurnoverRate: null,
+    minVolumeRatio: null,
+    maxVolumeRatio: null,
+  }),
+  false,
+  "深市主板 + 非创业板 should exclude 301-prefixed stocks"
+);
 
 const metrics = { a: 2, b: "red", c: 3, d: "green" };
 
