@@ -2531,10 +2531,6 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
 
   function currentMainIndicator() {
     const value = els.mainIndicatorSelect.value;
-    if (value === "custom-main") {
-      const item = state.importedMainIndicators[state.importedMainIndicators.length - 1];
-      return { type: item ? item.kind : "custom-main", label: item ? item.name : "自定义主图指标" };
-    }
     return { type: value, label: value === "boll" ? "BOLL线" : value === "boll-ma" ? "BOLL均线结合" : value === "boll-short" ? "BOLL短买结合" : "均线" };
   }
 
