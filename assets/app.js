@@ -871,7 +871,12 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
     const selectedTypes = Array.from(els.filters.type.querySelectorAll("input:checked")).map((input) => input.value);
     return {
       keyword: els.filters.keyword.value.trim().toLowerCase(),
-      types: selectedTypes.filter((type) => type !== "__non_st"),
+      types: selectedTypes.filter((type) => !type.startsWith("__")),
+      excludedTypes: [
+        selectedTypes.includes("__exclude_chinext") ? "创业板" : "",
+        selectedTypes.includes("__exclude_star") ? "科创板" : "",
+        selectedTypes.includes("__exclude_bse") ? "北交所" : "",
+      ].filter(Boolean),
       nonSt: selectedTypes.includes("__non_st"),
       minListingDays: toNumber(els.filters.minListingDays.value),
       maxListingDays: toNumber(els.filters.maxListingDays.value),
@@ -889,7 +894,13 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
   }
 
   function updateTypeFilterLabel() {
-    const selected = Array.from(els.filters.type.querySelectorAll("input:checked")).map((input) => (input.value === "__non_st" ? "非ST" : input.value));
+    const labelMap = {
+      __non_st: "非ST",
+      __exclude_chinext: "非创业板",
+      __exclude_star: "非科创板",
+      __exclude_bse: "非北交所",
+    };
+    const selected = Array.from(els.filters.type.querySelectorAll("input:checked")).map((input) => labelMap[input.value] || input.value);
     els.typeFilterButton.textContent = selected.length ? selected.join("，") : "全部类型";
     els.typeFilterButton.title = selected.join("，");
   }
@@ -922,6 +933,7 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
     return (
       keywordMatch &&
       (criteria.types.length === 0 || criteria.types.includes(quote.type)) &&
+      !(criteria.excludedTypes || []).includes(quote.type) &&
       (!criteria.nonSt || !/^\*?ST|退市|退$/.test(quote.name.toUpperCase())) &&
       insideRange(quote.listingDays, criteria.minListingDays, criteria.maxListingDays) &&
       insideRange(quote.floatMarketCap, criteria.minFloatMarketCap, criteria.maxFloatMarketCap) &&
@@ -1709,10 +1721,11 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
       <option value="boll">BOLL线</option>
       <option value="boll-ma">BOLL均线结合</option>
       <option value="boll-short">BOLL短买结合</option>
-      <option value="custom-main">自定义主图指标${state.importedMainIndicators.length ? `：${state.importedMainIndicators[state.importedMainIndicators.length - 1].name}` : ""}</option>
     `;
     if (Array.from(els.mainIndicatorSelect.options).some((option) => option.value === currentMain)) {
       els.mainIndicatorSelect.value = currentMain;
+    } else {
+      els.mainIndicatorSelect.value = "ma";
     }
     updateMainControlVisibility();
   }
@@ -3168,7 +3181,13 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
         state.importedMainIndicators.push(item);
         localStorage.setItem("aShareMainIndicators", JSON.stringify(state.importedMainIndicators));
         refreshIndicatorOptions();
-        els.mainIndicatorSelect.value = "custom-main";
+        if (Array.from(els.mainIndicatorSelect.options).some((option) => option.value === item.kind)) {
+          els.mainIndicatorSelect.value = item.kind;
+          els.statusText.textContent = `已导入主图指标：${item.name}`;
+        } else {
+          els.mainIndicatorSelect.value = "ma";
+          els.statusText.textContent = `已保存主图指标：${item.name}，当前暂不支持直接显示该公式。`;
+        }
         updateMainControlVisibility();
       } else {
         state.importedSubIndicators.push(item);
