@@ -286,10 +286,12 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
     addIndicatorConditionButton: document.getElementById("addIndicatorConditionButton"),
     saveIndicatorPlanButton: document.getElementById("saveIndicatorPlanButton"),
     runIndicatorScreenButton: document.getElementById("runIndicatorScreenButton"),
+    backtestIndicatorPlanButton: document.getElementById("backtestIndicatorPlanButton"),
     deleteIndicatorPlanButton: document.getElementById("deleteIndicatorPlanButton"),
     indicatorPlanName: document.getElementById("indicatorPlanName"),
     indicatorPlanSelect: document.getElementById("indicatorPlanSelect"),
     indicatorConditionList: document.getElementById("indicatorConditionList"),
+    indicatorBacktestResult: document.getElementById("indicatorBacktestResult"),
     filters: {
       keyword: document.getElementById("keywordFilter"),
       type: document.getElementById("typeFilter"),
@@ -1617,6 +1619,169 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
     };
   }
 
+  function createHistoricalMetricGetter(indicators, rows, indexRows, quote) {
+    const needed = new Set(indicators);
+    const cache = {};
+    const ensureBoll = () => {
+      if (cache.boll) return cache.boll;
+      cache.boll = {
+        values: calculateBoll(rows),
+        ma5: movingAverage(rows, 5, "close"),
+        ma10: movingAverage(rows, 10, "close"),
+        ma17: movingAverage(rows, 17, "close"),
+        ma20: movingAverage(rows, 20, "close"),
+        ma30: movingAverage(rows, 30, "close"),
+        ma60: movingAverage(rows, 60, "close"),
+        ma120: movingAverage(rows, 120, "close"),
+        ma250: movingAverage(rows, 250, "close"),
+      };
+      return cache.boll;
+    };
+    if (["ma", "boll", "boll-ma", "boll-short"].some((indicator) => needed.has(indicator))) ensureBoll();
+    if (needed.has("macd")) cache.macd = macd(rows);
+    if (needed.has("kdj")) cache.kdj = calculateKdj(rows);
+    if (needed.has("rsi")) cache.rsi = calculateRsi(rows);
+    if (needed.has("main-force")) cache.mainForce = calculateMainForce(rows, indexRows || [], quote);
+    if (needed.has("gold-chip")) cache.goldChip = calculateGoldChip(rows, quote);
+    if (needed.has("gold-control")) cache.goldControl = calculateGoldControl(rows);
+    if (needed.has("three-dragon")) cache.threeDragon = calculateThreeDragon(rows);
+
+    return (indicator, index) => {
+      const last = rows[index];
+      const prevIndex = Math.max(0, index - 1);
+      if (indicator === "ma" || indicator === "boll" || indicator === "boll-ma" || indicator === "boll-short") {
+        const source = ensureBoll();
+        const boll = source.values[index] || {};
+        const metrics = {
+          ma5: source.ma5[index],
+          ma10: source.ma10[index],
+          ma17: source.ma17[index],
+          ma20: source.ma20[index],
+          ma30: source.ma30[index],
+          ma60: source.ma60[index],
+          ma120: source.ma120[index],
+          ma250: source.ma250[index],
+          state: bollStateLabel(boll.trendState),
+          boll: boll.boll,
+          ub: boll.ub,
+          lb: boll.lb,
+          midColor: boll.add !== null && boll.add !== undefined ? "红色" : "绿色",
+          upperColor: boll.hold !== null && boll.hold !== undefined ? "红色" : "绿色",
+          lowerColor: boll.buy !== null && boll.buy !== undefined ? "红色" : "绿色",
+          close: last ? last.close : null,
+          gapUp: gapUpLabel(rows, index),
+        };
+        if (indicator === "ma") return { close: metrics.close, ma5: metrics.ma5, ma10: metrics.ma10, ma17: metrics.ma17, ma20: metrics.ma20, ma30: metrics.ma30, ma60: metrics.ma60, ma120: metrics.ma120, ma250: metrics.ma250, gapUp: metrics.gapUp };
+        if (indicator === "boll") return { boll: metrics.boll, ub: metrics.ub, lb: metrics.lb, close: metrics.close, ma5: metrics.ma5 };
+        return metrics;
+      }
+      if (indicator === "volume") return { volume: last ? last.volume : 0, barColor: last && last.close >= last.open ? "红色" : "绿色" };
+      if (indicator === "macd") {
+        const macdLast = cache.macd[index] || {};
+        const macdPrev = cache.macd[prevIndex] || {};
+        return {
+          dif: macdLast.dif || 0,
+          dea: macdLast.dea || 0,
+          hist: macdLast.hist || 0,
+          barColor: (macdLast.hist || 0) >= 0 ? "红色" : "绿色",
+          goldenCross: yesNo((macdPrev.dif || 0) <= (macdPrev.dea || 0) && (macdLast.dif || 0) > (macdLast.dea || 0)),
+          deadCross: yesNo((macdPrev.dif || 0) >= (macdPrev.dea || 0) && (macdLast.dif || 0) < (macdLast.dea || 0)),
+        };
+      }
+      if (indicator === "kdj") {
+        const kdjLast = cache.kdj[index] || {};
+        const kdjPrev = cache.kdj[prevIndex] || {};
+        return {
+          k: kdjLast.k || 0,
+          d: kdjLast.d || 0,
+          j: kdjLast.j || 0,
+          goldenCross: yesNo((kdjPrev.k || 0) <= (kdjPrev.d || 0) && (kdjLast.k || 0) > (kdjLast.d || 0)),
+          deadCross: yesNo((kdjPrev.k || 0) >= (kdjPrev.d || 0) && (kdjLast.k || 0) < (kdjLast.d || 0)),
+        };
+      }
+      if (indicator === "rsi") {
+        const rsiLast = cache.rsi[index] || {};
+        const rsiPrev = cache.rsi[prevIndex] || {};
+        return {
+          rsi6: rsiLast.rsi6 || 0,
+          rsi12: rsiLast.rsi12 || 0,
+          rsi24: rsiLast.rsi24 || 0,
+          rsi6CrossUp20: yesNo((rsiPrev.rsi6 || 0) <= 20 && (rsiLast.rsi6 || 0) > 20),
+          rsi6CrossDown80: yesNo((rsiPrev.rsi6 || 0) >= 80 && (rsiLast.rsi6 || 0) < 80),
+        };
+      }
+      if (indicator === "main-force") {
+        const mainForce = cache.mainForce[index] || {};
+        return { shortAttack: mainForce.shortAttack || 0, midStrong: mainForce.midStrong || 0, midControl: mainForce.midControl || 0, midOversold: mainForce.midOversold || 0, retailMoney: mainForce.retailMoney || 0 };
+      }
+      if (indicator === "gold-chip") {
+        const goldChip = cache.goldChip[index] || {};
+        return { mainChip: goldChip.mainChip || 0, retailChip: goldChip.retailChip || 0, lockChip: goldChip.lockChip || 0, floatChip: goldChip.floatChip || 0, controlLine: goldChip.controlLine || 0, barColor: (goldChip.mainChip || 0) > 0 ? "红色" : "蓝色" };
+      }
+      if (indicator === "gold-control") {
+        const goldControl = cache.goldControl[index] || {};
+        return {
+          control: goldControl.control || 0,
+          noControl: goldControl.noControl || 0,
+          start: goldControl.start || 0,
+          hasControl: goldControl.hasControl || 0,
+          highControl: goldControl.highControl || 0,
+          exit: goldControl.exit || 0,
+          barColor: goldControl.highControl ? "紫色" : goldControl.exit ? "绿色" : (goldControl.control || 0) > 0 ? "红色" : "灰色",
+        };
+      }
+      if (indicator === "three-dragon") {
+        const threeDragon = cache.threeDragon[index] || {};
+        const dragonKeys = ["trendRed", "energyRed", "midRed", "shortRed"];
+        return {
+          redCount: dragonKeys.reduce((count, key) => count + (threeDragon[key] ? 1 : 0), 0),
+          trendColor: redGreen(threeDragon.trendRed),
+          energyColor: redGreen(threeDragon.energyRed),
+          midColor: redGreen(threeDragon.midRed),
+          shortColor: redGreen(threeDragon.shortRed),
+          controlDegree: threeDragon.controlDegree || 0,
+          longTrend: yesNo(threeDragon.longTrend),
+        };
+      }
+      return {};
+    };
+  }
+
+  function conditionPassesAtIndex(condition, metricsByIndicator) {
+    const indicator = condition.indicator || "";
+    if (!metricsByIndicator[indicator]) return false;
+    return evaluateIndicatorCondition(condition, metricsByIndicator);
+  }
+
+  function halfYearStartDate() {
+    const start = new Date();
+    start.setMonth(start.getMonth() - 6);
+    return start.toISOString().slice(0, 10);
+  }
+
+  async function backtestQuoteIndicatorPlan(quote, plan) {
+    const normalizedPlan = normalizeIndicatorPlan(plan);
+    const conditions = (normalizedPlan.conditions || []).filter((condition) => condition && (condition.field || condition.metric));
+    if (!conditions.length) return { quote, dates: [] };
+    const unsupported = conditions.find((condition) => (condition.period || "day") !== "day");
+    if (unsupported) throw new Error("近半年测试目前只支持日K条件");
+    const rows = await fetchKlineForPeriod(quote.symbol, "day");
+    if (!rows.length) throw new Error("无K线数据");
+    const indexRows = indexRowsRequired(conditions) ? await fetchIndexKlineForQuotePeriod(quote, "day").catch(() => []) : [];
+    const indicators = [...new Set(conditions.map((condition) => condition.indicator || ""))];
+    const getMetrics = createHistoricalMetricGetter(indicators, rows, indexRows, quote);
+    const startDate = halfYearStartDate();
+    const dates = [];
+    const firstIndex = rows.findIndex((row) => row.date && row.date.slice(0, 10) >= startDate);
+    const startIndex = firstIndex >= 0 ? firstIndex : Math.max(0, rows.length - 126);
+    for (let index = Math.max(1, startIndex); index < rows.length; index += 1) {
+      const metricsByIndicator = {};
+      for (const indicator of indicators) metricsByIndicator[indicator] = getMetrics(indicator, index);
+      if (conditions.every((condition) => conditionPassesAtIndex(condition, metricsByIndicator))) dates.push(rows[index].date.slice(0, 10));
+    }
+    return { quote, dates };
+  }
+
   function conditionLabel(condition) {
     const indicator = indicatorDef(condition.indicator);
     const field = indicatorFieldDef(condition.indicator, condition.field);
@@ -1704,6 +1869,88 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
     sortFiltered();
     renderQuoteTable();
     els.indicatorScreenStatus.textContent = `筛选完成：命中 ${matches.length} / ${base.length}${topReasons ? `。未命中主要原因：${topReasons}` : "。"}`;
+  }
+
+  function renderBacktestResults(results, limit = 80) {
+    const visible = results.slice(0, limit);
+    els.indicatorBacktestResult.hidden = false;
+    els.indicatorBacktestResult.innerHTML = visible.length
+      ? `<div class="backtest-result-title">近半年历史命中</div>${visible
+          .map(({ quote, dates }) => `<div class="backtest-result-row"><strong>${escapeHtml(quote.name)} ${escapeHtml(quote.code)}</strong><span>${dates.length}次</span><em>${dates.map(escapeHtml).join("、")}</em></div>`)
+          .join("")}${results.length > limit ? `<div class="backtest-result-more">还有 ${results.length - limit} 只股票未展开显示，股票列表中已全部保留。</div>` : ""}`
+      : `<div class="backtest-result-title">近半年历史命中</div><div class="backtest-result-empty">没有股票在近半年内满足当前全部条件。</div>`;
+  }
+
+  async function runIndicatorBacktest() {
+    const plan = readIndicatorPlanFromForm();
+    const normalizedPlan = normalizeIndicatorPlan(plan);
+    const conditions = (normalizedPlan.conditions || []).filter((condition) => condition && (condition.field || condition.metric));
+    if (conditions.some((condition) => (condition.period || "day") !== "day")) {
+      els.indicatorScreenStatus.textContent = "近半年测试目前只支持日K条件，请把条件周期先改成日K。";
+      return;
+    }
+    const runToken = Date.now();
+    state.indicatorBacktestToken = runToken;
+    const base = state.quotes.filter((quote) => quoteMatches(quote, readCriteria()));
+    const results = [];
+    const matchedQuotes = [];
+    const klineErrors = new Map();
+    let failed = 0;
+    let completed = 0;
+    let lastPublished = 0;
+    const workerCount = Math.min(IS_MOBILE ? 4 : 8, Math.max(1, base.length));
+    els.backtestIndicatorPlanButton.disabled = true;
+    els.runIndicatorScreenButton.disabled = true;
+    els.indicatorBacktestResult.hidden = true;
+    els.indicatorBacktestResult.innerHTML = "";
+    els.indicatorScreenStatus.textContent = `开始近半年测试：${normalizedPlan.name}，共 ${base.length} 只股票，并发 ${workerCount}。`;
+    const publish = (force = false) => {
+      const now = Date.now();
+      if (!force && now - lastPublished < 1200) return;
+      lastPublished = now;
+      state.filtered = [...matchedQuotes];
+      state.currentPage = 1;
+      sortFiltered();
+      renderQuoteTable();
+    };
+    const workers = Array.from({ length: workerCount }, async (_, workerIndex) => {
+      for (let index = workerIndex; index < base.length; index += workerCount) {
+        if (state.indicatorBacktestToken !== runToken) return;
+        const quote = base[index];
+        try {
+          const result = await backtestQuoteIndicatorPlan(quote, normalizedPlan);
+          if (result.dates.length) {
+            results.push(result);
+            matchedQuotes.push(quote);
+          }
+        } catch (error) {
+          failed += 1;
+          const message = String((error && error.message) || error || "未知错误").slice(0, 48);
+          klineErrors.set(message, (klineErrors.get(message) || 0) + 1);
+        }
+        completed += 1;
+        if (completed % 12 === 0 || completed === base.length) {
+          publish();
+          els.indicatorScreenStatus.textContent = `近半年测试中 ${completed}/${base.length}，已有 ${results.length} 只股票曾经满足，K线失败 ${failed}`;
+          await new Promise((resolve) => setTimeout(resolve, 0));
+        }
+      }
+    });
+    await Promise.all(workers);
+    els.backtestIndicatorPlanButton.disabled = false;
+    els.runIndicatorScreenButton.disabled = false;
+    results.sort((a, b) => b.dates.length - a.dates.length || a.quote.code.localeCompare(b.quote.code));
+    state.filtered = results.map((result) => result.quote);
+    state.currentPage = 1;
+    sortFiltered();
+    renderQuoteTable();
+    renderBacktestResults(results);
+    const topKlineErrors = [...klineErrors.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 2)
+      .map(([label, count]) => `${label}：${count}`)
+      .join("；");
+    els.indicatorScreenStatus.textContent = `近半年测试完成：${results.length} 只股票曾经满足当前全部条件；列表已显示这些股票${failed ? `；另有 ${failed} 只K线失败未参与判断${topKlineErrors ? `（${topKlineErrors}）` : ""}` : ""}。`;
   }
 
   function renderQuoteHead() {
@@ -3493,6 +3740,7 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
     els.saveIndicatorPlanButton.addEventListener("click", saveIndicatorPlan);
     els.deleteIndicatorPlanButton.addEventListener("click", deleteIndicatorPlan);
     els.runIndicatorScreenButton.addEventListener("click", runIndicatorScreen);
+    els.backtestIndicatorPlanButton.addEventListener("click", runIndicatorBacktest);
     els.indicatorPlanSelect.addEventListener("change", () => {
       const index = Number(els.indicatorPlanSelect.value);
       if (Number.isInteger(index) && state.indicatorPlans[index]) loadIndicatorPlan(state.indicatorPlans[index]);
