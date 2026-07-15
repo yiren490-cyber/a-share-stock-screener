@@ -1770,6 +1770,19 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
     return ((next - base) / base) * 100;
   }
 
+  function backtestFutureDay(row, buyClose, compareClose) {
+    if (!row) return { date: "", open: null, high: null, low: null, close: null, pct: null, higherThanCompare: false };
+    return {
+      date: row.date.slice(0, 10),
+      open: row.open,
+      high: row.high,
+      low: row.low,
+      close: row.close,
+      pct: pctFromClose(buyClose, row.close),
+      higherThanCompare: Number.isFinite(compareClose) && row.close > compareClose,
+    };
+  }
+
   function backtestTradeAt(rows, index) {
     const current = rows[index];
     const prev = rows[index - 1];
@@ -1777,19 +1790,34 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
     const next2 = rows[index + 2];
     const next3 = rows[index + 3];
     const buyClose = current ? current.close : null;
+    const t1 = backtestFutureDay(next1, buyClose, prev ? prev.close : null);
+    const t2 = backtestFutureDay(next2, buyClose, buyClose);
+    const t3 = backtestFutureDay(next3, buyClose, buyClose);
     return {
       date: current ? current.date.slice(0, 10) : "",
       buyClose,
       prevClose: prev ? prev.close : null,
-      t1Date: next1 ? next1.date.slice(0, 10) : "",
-      t1Pct: next1 ? pctFromClose(buyClose, next1.close) : null,
-      t1HigherThanPrevClose: Boolean(next1 && prev && next1.close > prev.close),
-      t2Date: next2 ? next2.date.slice(0, 10) : "",
-      t2Pct: next2 ? pctFromClose(buyClose, next2.close) : null,
-      t2HigherThanBuyClose: Boolean(next2 && next2.close > buyClose),
-      t3Date: next3 ? next3.date.slice(0, 10) : "",
-      t3Pct: next3 ? pctFromClose(buyClose, next3.close) : null,
-      t3HigherThanBuyClose: Boolean(next3 && next3.close > buyClose),
+      t1Date: t1.date,
+      t1Open: t1.open,
+      t1High: t1.high,
+      t1Low: t1.low,
+      t1Close: t1.close,
+      t1Pct: t1.pct,
+      t1HigherThanPrevClose: t1.higherThanCompare,
+      t2Date: t2.date,
+      t2Open: t2.open,
+      t2High: t2.high,
+      t2Low: t2.low,
+      t2Close: t2.close,
+      t2Pct: t2.pct,
+      t2HigherThanBuyClose: t2.higherThanCompare,
+      t3Date: t3.date,
+      t3Open: t3.open,
+      t3High: t3.high,
+      t3Low: t3.low,
+      t3Close: t3.close,
+      t3Pct: t3.pct,
+      t3HigherThanBuyClose: t3.higherThanCompare,
     };
   }
 
@@ -1939,18 +1967,38 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
     return value >= 0 ? "is-up" : "is-down";
   }
 
+  function formatBacktestPrice(value) {
+    return Number.isFinite(value) ? value.toFixed(2) : "--";
+  }
+
+  function backtestTableHead() {
+    return `<thead><tr><th>股票</th><th>信号日</th><th>买入收盘</th><th>T+1日期</th><th>T+1开</th><th>T+1高</th><th>T+1低</th><th>T+1收</th><th>T+1涨跌幅</th><th>T+1高于前收</th><th>T+2日期</th><th>T+2开</th><th>T+2高</th><th>T+2低</th><th>T+2收</th><th>T+2涨跌幅</th><th>T+2高于买收</th><th>T+3日期</th><th>T+3开</th><th>T+3高</th><th>T+3低</th><th>T+3收</th><th>T+3涨跌幅</th><th>T+3高于买收</th></tr></thead>`;
+  }
+
   function backtestTradeRow(quote, trade) {
     return `<tr>
       <td>${escapeHtml(quote.name)} ${escapeHtml(quote.code)}</td>
       <td>${escapeHtml(trade.date)}</td>
-      <td>${Number.isFinite(trade.buyClose) ? trade.buyClose.toFixed(2) : "--"}</td>
+      <td>${formatBacktestPrice(trade.buyClose)}</td>
       <td>${escapeHtml(trade.t1Date || "--")}</td>
+      <td>${formatBacktestPrice(trade.t1Open)}</td>
+      <td>${formatBacktestPrice(trade.t1High)}</td>
+      <td>${formatBacktestPrice(trade.t1Low)}</td>
+      <td>${formatBacktestPrice(trade.t1Close)}</td>
       <td class="${backtestPctClass(trade.t1Pct)}">${formatBacktestPct(trade.t1Pct)}</td>
       <td>${Number.isFinite(trade.t1Pct) ? (trade.t1HigherThanPrevClose ? "是" : "否") : "--"}</td>
       <td>${escapeHtml(trade.t2Date || "--")}</td>
+      <td>${formatBacktestPrice(trade.t2Open)}</td>
+      <td>${formatBacktestPrice(trade.t2High)}</td>
+      <td>${formatBacktestPrice(trade.t2Low)}</td>
+      <td>${formatBacktestPrice(trade.t2Close)}</td>
       <td class="${backtestPctClass(trade.t2Pct)}">${formatBacktestPct(trade.t2Pct)}</td>
       <td>${Number.isFinite(trade.t2Pct) ? (trade.t2HigherThanBuyClose ? "是" : "否") : "--"}</td>
       <td>${escapeHtml(trade.t3Date || "--")}</td>
+      <td>${formatBacktestPrice(trade.t3Open)}</td>
+      <td>${formatBacktestPrice(trade.t3High)}</td>
+      <td>${formatBacktestPrice(trade.t3Low)}</td>
+      <td>${formatBacktestPrice(trade.t3Close)}</td>
       <td class="${backtestPctClass(trade.t3Pct)}">${formatBacktestPct(trade.t3Pct)}</td>
       <td>${Number.isFinite(trade.t3Pct) ? (trade.t3HigherThanBuyClose ? "是" : "否") : "--"}</td>
     </tr>`;
@@ -1979,7 +2027,7 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
                     <span>${trades.length}次命中</span>
                   </div>
                   <div class="backtest-table-wrap"><table class="backtest-table">
-                    <thead><tr><th>股票</th><th>信号日</th><th>买入收盘</th><th>T+1日期</th><th>T+1涨跌幅</th><th>T+1高于前收</th><th>T+2日期</th><th>T+2涨跌幅</th><th>T+2高于买收</th><th>T+3日期</th><th>T+3涨跌幅</th><th>T+3高于买收</th></tr></thead>
+                    ${backtestTableHead()}
                     <tbody>${trades.map((trade) => backtestTradeRow(quote, trade)).join("")}</tbody>
                   </table></div>
                 </section>`
@@ -2001,7 +2049,7 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
   function downloadBacktestReport() {
     const results = state.backtestResults || [];
     const summary = summarizeBacktestTrades(results);
-    const header = ["股票名称", "股票代码", "信号日", "买入收盘价", "T+1日期", "T+1涨跌幅", "T+1是否高于前收", "T+2日期", "T+2涨跌幅", "T+2是否高于买收", "T+3日期", "T+3涨跌幅", "T+3是否高于买收"];
+    const header = ["股票名称", "股票代码", "信号日", "买入收盘价", "T+1日期", "T+1开盘", "T+1最高", "T+1最低", "T+1收盘", "T+1涨跌幅", "T+1是否高于前收", "T+2日期", "T+2开盘", "T+2最高", "T+2最低", "T+2收盘", "T+2涨跌幅", "T+2是否高于买收", "T+3日期", "T+3开盘", "T+3最高", "T+3最低", "T+3收盘", "T+3涨跌幅", "T+3是否高于买收"];
     const summaryRows = [
       ["汇总", "命中股票", summary.stockCount],
       ["汇总", "总命中次数", summary.tradeCount],
@@ -2015,14 +2063,26 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
         quote.name,
         quote.code,
         trade.date,
-        Number.isFinite(trade.buyClose) ? trade.buyClose.toFixed(2) : "",
+        formatBacktestPrice(trade.buyClose),
         trade.t1Date || "",
+        formatBacktestPrice(trade.t1Open),
+        formatBacktestPrice(trade.t1High),
+        formatBacktestPrice(trade.t1Low),
+        formatBacktestPrice(trade.t1Close),
         formatBacktestPct(trade.t1Pct),
         Number.isFinite(trade.t1Pct) ? (trade.t1HigherThanPrevClose ? "是" : "否") : "",
         trade.t2Date || "",
+        formatBacktestPrice(trade.t2Open),
+        formatBacktestPrice(trade.t2High),
+        formatBacktestPrice(trade.t2Low),
+        formatBacktestPrice(trade.t2Close),
         formatBacktestPct(trade.t2Pct),
         Number.isFinite(trade.t2Pct) ? (trade.t2HigherThanBuyClose ? "是" : "否") : "",
         trade.t3Date || "",
+        formatBacktestPrice(trade.t3Open),
+        formatBacktestPrice(trade.t3High),
+        formatBacktestPrice(trade.t3Low),
+        formatBacktestPrice(trade.t3Close),
         formatBacktestPct(trade.t3Pct),
         Number.isFinite(trade.t3Pct) ? (trade.t3HigherThanBuyClose ? "是" : "否") : "",
       ])
