@@ -84,6 +84,7 @@
         ["ma60", "MA60", "number"],
         ["ma120", "MA120", "number"],
         ["ma250", "MA250", "number"],
+        ["gapUp", "跳空高开", "select", ["是", "否"]],
       ],
     },
     {
@@ -157,6 +158,7 @@
       { indicator: "boll-short", period: "day", field: "lowerColor", operator: "eq", value: "红色" },
       { indicator: "boll-short", period: "day", field: "close", operator: "gt", value: "ma5" },
       { indicator: "boll-short", period: "day", field: "close", operator: "lt", value: "ub" },
+      { indicator: "ma", period: "day", field: "gapUp", operator: "eq", value: "是" },
       { indicator: "main-force", period: "day", field: "shortAttack", operator: "gt", value: "0" },
       { indicator: "gold-chip", period: "day", field: "mainChip", operator: "gt", value: "0" },
       { indicator: "gold-control", period: "day", field: "barColor", operator: "contains", value: "红色,紫色" },
@@ -1072,6 +1074,107 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
     };
   }
 
+  function gapUpLabel(rows, index) {
+    if (index <= 0 || !rows[index] || !rows[index - 1]) return "否";
+    return rows[index].low > rows[index - 1].high ? "是" : "否";
+  }
+
+  function collectSingleIndicatorMetrics(indicator, rows, indexRows, quote) {
+    const lastIndex = rows.length - 1;
+    const last = rows[lastIndex];
+    const prevIndex = Math.max(0, lastIndex - 1);
+    if (indicator === "ma" || indicator === "boll" || indicator === "boll-ma" || indicator === "boll-short") {
+      const bollMetrics = bollMetricsAt(rows, lastIndex);
+      const maMetrics = {
+        close: last ? last.close : null,
+        ma5: bollMetrics.ma5,
+        ma10: bollMetrics.ma10,
+        ma17: bollMetrics.ma17,
+        ma20: bollMetrics.ma20,
+        ma30: bollMetrics.ma30,
+        ma60: bollMetrics.ma60,
+        ma120: bollMetrics.ma120,
+        ma250: bollMetrics.ma250,
+        gapUp: gapUpLabel(rows, lastIndex),
+      };
+      if (indicator === "ma") return maMetrics;
+      if (indicator === "boll") return { boll: bollMetrics.boll, ub: bollMetrics.ub, lb: bollMetrics.lb, close: bollMetrics.close, ma5: bollMetrics.ma5 };
+      return bollMetrics;
+    }
+    if (indicator === "volume") return { volume: last ? last.volume : 0, barColor: last && last.close >= last.open ? "红色" : "绿色" };
+    if (indicator === "macd") {
+      const macdValues = macd(rows);
+      const macdLast = macdValues[lastIndex] || {};
+      const macdPrev = macdValues[prevIndex] || {};
+      return {
+        dif: macdLast.dif || 0,
+        dea: macdLast.dea || 0,
+        hist: macdLast.hist || 0,
+        barColor: (macdLast.hist || 0) >= 0 ? "红色" : "绿色",
+        goldenCross: yesNo((macdPrev.dif || 0) <= (macdPrev.dea || 0) && (macdLast.dif || 0) > (macdLast.dea || 0)),
+        deadCross: yesNo((macdPrev.dif || 0) >= (macdPrev.dea || 0) && (macdLast.dif || 0) < (macdLast.dea || 0)),
+      };
+    }
+    if (indicator === "kdj") {
+      const kdjValues = calculateKdj(rows);
+      const kdjLast = kdjValues[lastIndex] || {};
+      const kdjPrev = kdjValues[prevIndex] || {};
+      return {
+        k: kdjLast.k || 0,
+        d: kdjLast.d || 0,
+        j: kdjLast.j || 0,
+        goldenCross: yesNo((kdjPrev.k || 0) <= (kdjPrev.d || 0) && (kdjLast.k || 0) > (kdjLast.d || 0)),
+        deadCross: yesNo((kdjPrev.k || 0) >= (kdjPrev.d || 0) && (kdjLast.k || 0) < (kdjLast.d || 0)),
+      };
+    }
+    if (indicator === "rsi") {
+      const rsiValues = calculateRsi(rows);
+      const rsiLast = rsiValues[lastIndex] || {};
+      const rsiPrev = rsiValues[prevIndex] || {};
+      return {
+        rsi6: rsiLast.rsi6 || 0,
+        rsi12: rsiLast.rsi12 || 0,
+        rsi24: rsiLast.rsi24 || 0,
+        rsi6CrossUp20: yesNo((rsiPrev.rsi6 || 0) <= 20 && (rsiLast.rsi6 || 0) > 20),
+        rsi6CrossDown80: yesNo((rsiPrev.rsi6 || 0) >= 80 && (rsiLast.rsi6 || 0) < 80),
+      };
+    }
+    if (indicator === "main-force") {
+      const mainForce = calculateMainForce(rows, indexRows || [], quote)[lastIndex] || {};
+      return { shortAttack: mainForce.shortAttack || 0, midStrong: mainForce.midStrong || 0, midControl: mainForce.midControl || 0, midOversold: mainForce.midOversold || 0, retailMoney: mainForce.retailMoney || 0 };
+    }
+    if (indicator === "gold-chip") {
+      const goldChip = calculateGoldChip(rows, quote)[lastIndex] || {};
+      return { mainChip: goldChip.mainChip || 0, retailChip: goldChip.retailChip || 0, lockChip: goldChip.lockChip || 0, floatChip: goldChip.floatChip || 0, controlLine: goldChip.controlLine || 0, barColor: (goldChip.mainChip || 0) > 0 ? "红色" : "蓝色" };
+    }
+    if (indicator === "gold-control") {
+      const goldControl = calculateGoldControl(rows)[lastIndex] || {};
+      return {
+        control: goldControl.control || 0,
+        noControl: goldControl.noControl || 0,
+        start: goldControl.start || 0,
+        hasControl: goldControl.hasControl || 0,
+        highControl: goldControl.highControl || 0,
+        exit: goldControl.exit || 0,
+        barColor: goldControl.highControl ? "紫色" : goldControl.exit ? "绿色" : (goldControl.control || 0) > 0 ? "红色" : "灰色",
+      };
+    }
+    if (indicator === "three-dragon") {
+      const threeDragon = calculateThreeDragon(rows)[lastIndex] || {};
+      const dragonKeys = ["trendRed", "energyRed", "midRed", "shortRed"];
+      return {
+        redCount: dragonKeys.reduce((count, key) => count + (threeDragon[key] ? 1 : 0), 0),
+        trendColor: redGreen(threeDragon.trendRed),
+        energyColor: redGreen(threeDragon.energyRed),
+        midColor: redGreen(threeDragon.midRed),
+        shortColor: redGreen(threeDragon.shortRed),
+        controlDegree: threeDragon.controlDegree || 0,
+        longTrend: yesNo(threeDragon.longTrend),
+      };
+    }
+    return {};
+  }
+
   function collectIndicatorMetrics(rows, indexRows, quote) {
     const lastIndex = rows.length - 1;
     const last = rows[lastIndex];
@@ -1101,6 +1204,7 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
       ma60: bollMetrics.ma60,
       ma120: bollMetrics.ma120,
       ma250: bollMetrics.ma250,
+      gapUp: gapUpLabel(rows, lastIndex),
     };
     return {
       ma: maMetrics,
@@ -1474,17 +1578,41 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
     return collectIndicatorMetrics(rows, indexRows, quote);
   }
 
+  function indexRowsRequired(conditions) {
+    return conditions.some((condition) => condition.indicator === "main-force");
+  }
+
   async function quotePassesIndicatorPlan(quote, plan) {
     const normalizedPlan = normalizeIndicatorPlan(plan);
-    const periods = [...new Set((normalizedPlan.conditions || []).map((condition) => condition.period || "day"))];
+    const conditions = (normalizedPlan.conditions || []).filter((condition) => condition && (condition.field || condition.metric));
+    const periods = [...new Set(conditions.map((condition) => condition.period || "day"))];
     const metricsByPeriod = {};
+    const rowsByPeriod = {};
+    const indexRowsByPeriod = {};
     for (const period of periods) {
-      metricsByPeriod[period] = await metricsForQuoteAndPeriod(quote, period);
+      const periodConditions = conditions.filter((condition) => (condition.period || "day") === period);
+      const rows = await fetchKlineForPeriod(quote.symbol, period);
+      if (!rows.length) throw new Error("无K线数据");
+      rowsByPeriod[period] = rows;
+      indexRowsByPeriod[period] = indexRowsRequired(periodConditions) ? await fetchIndexKlineForQuotePeriod(quote, period).catch(() => []) : [];
+      metricsByPeriod[period] = {};
+      for (const condition of periodConditions) {
+        const indicator = condition.indicator || "";
+        if (!metricsByPeriod[period][indicator]) {
+          metricsByPeriod[period][indicator] = collectSingleIndicatorMetrics(indicator, rowsByPeriod[period], indexRowsByPeriod[period], quote);
+        }
+        if (!evaluateIndicatorCondition(condition, metricsByPeriod[period])) {
+          return {
+            passed: false,
+            failed: [condition],
+            metricsByPeriod,
+          };
+        }
+      }
     }
-    const failed = (normalizedPlan.conditions || []).filter((condition) => !evaluateIndicatorCondition(condition, metricsByPeriod[condition.period || "day"] || {}));
     return {
-      passed: failed.length === 0,
-      failed,
+      passed: true,
+      failed: [],
       metricsByPeriod,
     };
   }

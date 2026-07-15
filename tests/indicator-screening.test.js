@@ -156,4 +156,16 @@ assert.strictEqual(
   true
 );
 
+assert.strictEqual(
+  evaluateIndicatorPlan(
+    {
+      conditions: [{ indicator: "ma", field: "gapUp", operator: "eq", value: "是" }],
+    },
+    {
+      ma: { gapUp: "是" },
+    }
+  ).passed,
+  true
+);
+
 console.log("indicator-screening tests passed");
