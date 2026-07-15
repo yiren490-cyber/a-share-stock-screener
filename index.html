@@ -97,6 +97,7 @@
             <button id="saveIndicatorPlanButton" type="button">保存方案</button>
             <button id="runIndicatorScreenButton" type="button">运行筛选</button>
             <button id="backtestIndicatorPlanButton" type="button">近半年测试</button>
+            <button id="openBacktestReportButton" type="button" hidden>查看报表</button>
           </div>
         </div>
         <div class="screener-body">
@@ -271,6 +272,16 @@
             <button id="saveManagedCategoryButton" type="button">保存</button>
           </div>
         </div>
+      </div>
+    </div>
+
+    <div class="modal-backdrop" id="backtestReportModal" hidden>
+      <div class="backtest-modal" role="dialog" aria-modal="true" aria-label="策略测试报表">
+        <div class="modal-header">
+          <h3>策略测试报表</h3>
+          <button id="closeBacktestReportButton" type="button">关闭</button>
+        </div>
+        <div class="backtest-report-content" id="backtestReportContent"></div>
       </div>
     </div>
 

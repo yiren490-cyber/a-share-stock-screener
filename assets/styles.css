@@ -700,6 +700,57 @@ tbody tr:nth-child(even) {
   box-shadow: 0 22px 60px rgba(15, 23, 42, 0.24);
 }
 
+.backtest-modal {
+  width: min(1180px, calc(100vw - 28px));
+  max-height: calc(100vh - 28px);
+  overflow: hidden;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 22px 60px rgba(15, 23, 42, 0.24);
+}
+
+.backtest-modal .modal-header {
+  padding: 12px 14px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.backtest-report-content {
+  max-height: calc(100vh - 90px);
+  overflow: auto;
+  padding: 12px;
+  background: #f8fafc;
+}
+
+.backtest-stock-card {
+  margin-top: 12px;
+  border: 1px solid #dfe5ec;
+  border-radius: 7px;
+  overflow: hidden;
+  background: #ffffff;
+}
+
+.backtest-stock-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-bottom: 1px solid #e2e8f0;
+  background: #ffffff;
+}
+
+.backtest-stock-title strong {
+  color: #0f172a;
+  font-size: 14px;
+}
+
+.backtest-stock-title span {
+  color: #d93025;
+  font-size: 13px;
+  font-weight: 700;
+}
+
 .modal-header,
 .modal-actions {
   display: flex;
@@ -1001,7 +1052,7 @@ tbody tr.selected {
 }
 
 .chart-info {
-  min-height: 46px;
+  height: 52px;
   margin-bottom: 6px;
   padding: 6px 8px;
   border: 1px solid #e2e8f0;
@@ -1012,13 +1063,16 @@ tbody tr.selected {
   font-weight: 700;
   line-height: 1.55;
   white-space: normal;
+  overflow: hidden;
+  contain: layout paint;
 }
 
 .chart-info div {
   display: flex;
   flex-wrap: wrap;
   gap: 6px 12px;
-  overflow: visible;
+  max-height: 18px;
+  overflow: hidden;
   text-overflow: clip;
   white-space: normal;
 }
