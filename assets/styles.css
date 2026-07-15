@@ -759,6 +759,12 @@ tbody tr:nth-child(even) {
   gap: 10px;
 }
 
+.modal-header-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .modal-header button,
 .modal-actions button,
 .new-category-row button {

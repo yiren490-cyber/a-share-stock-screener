@@ -296,6 +296,7 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
     indicatorBacktestResult: document.getElementById("indicatorBacktestResult"),
     backtestReportModal: document.getElementById("backtestReportModal"),
     closeBacktestReportButton: document.getElementById("closeBacktestReportButton"),
+    exportBacktestReportButton: document.getElementById("exportBacktestReportButton"),
     backtestReportContent: document.getElementById("backtestReportContent"),
     filters: {
       keyword: document.getElementById("keywordFilter"),
@@ -1995,6 +1996,44 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
 
   function closeBacktestReport() {
     els.backtestReportModal.hidden = true;
+  }
+
+  function downloadBacktestReport() {
+    const results = state.backtestResults || [];
+    const summary = summarizeBacktestTrades(results);
+    const header = ["股票名称", "股票代码", "信号日", "买入收盘价", "T+1日期", "T+1涨跌幅", "T+1是否高于前收", "T+2日期", "T+2涨跌幅", "T+2是否高于买收", "T+3日期", "T+3涨跌幅", "T+3是否高于买收"];
+    const summaryRows = [
+      ["汇总", "命中股票", summary.stockCount],
+      ["汇总", "总命中次数", summary.tradeCount],
+      ["汇总", "T+1胜率", formatBacktestRate(summary.t1.winRate), "T+1平均涨跌幅", formatBacktestPct(summary.t1.avgPct)],
+      ["汇总", "T+2胜率", formatBacktestRate(summary.t2.winRate), "T+2平均涨跌幅", formatBacktestPct(summary.t2.avgPct)],
+      ["汇总", "T+3胜率", formatBacktestRate(summary.t3.winRate), "T+3平均涨跌幅", formatBacktestPct(summary.t3.avgPct)],
+      [],
+    ];
+    const rows = results.flatMap(({ quote, trades }) =>
+      trades.map((trade) => [
+        quote.name,
+        quote.code,
+        trade.date,
+        Number.isFinite(trade.buyClose) ? trade.buyClose.toFixed(2) : "",
+        trade.t1Date || "",
+        formatBacktestPct(trade.t1Pct),
+        Number.isFinite(trade.t1Pct) ? (trade.t1HigherThanPrevClose ? "是" : "否") : "",
+        trade.t2Date || "",
+        formatBacktestPct(trade.t2Pct),
+        Number.isFinite(trade.t2Pct) ? (trade.t2HigherThanBuyClose ? "是" : "否") : "",
+        trade.t3Date || "",
+        formatBacktestPct(trade.t3Pct),
+        Number.isFinite(trade.t3Pct) ? (trade.t3HigherThanBuyClose ? "是" : "否") : "",
+      ])
+    );
+    const csv = [...summaryRows, header, ...rows].map((row) => row.map((cell) => `"${String(cell ?? "").replace(/"/g, '""')}"`).join(",")).join("\n");
+    const blob = new Blob([`\ufeff${csv}`], { type: "text/csv;charset=utf-8" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `a-share-backtest-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(link.href);
   }
 
   function renderBacktestResults(results) {
@@ -3856,6 +3895,7 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
     els.backtestIndicatorPlanButton.addEventListener("click", runIndicatorBacktest);
     els.openBacktestReportButton.addEventListener("click", openBacktestReport);
     els.closeBacktestReportButton.addEventListener("click", closeBacktestReport);
+    els.exportBacktestReportButton.addEventListener("click", downloadBacktestReport);
     els.backtestReportModal.addEventListener("click", (event) => {
       if (event.target === els.backtestReportModal) closeBacktestReport();
     });
