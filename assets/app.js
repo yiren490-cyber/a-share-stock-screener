@@ -1759,10 +1759,59 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
     return start.toISOString().slice(0, 10);
   }
 
+  function pctFromClose(base, next) {
+    if (!Number.isFinite(base) || !Number.isFinite(next) || base === 0) return null;
+    return ((next - base) / base) * 100;
+  }
+
+  function backtestTradeAt(rows, index) {
+    const current = rows[index];
+    const prev = rows[index - 1];
+    const next1 = rows[index + 1];
+    const next2 = rows[index + 2];
+    const next3 = rows[index + 3];
+    const buyClose = current ? current.close : null;
+    return {
+      date: current ? current.date.slice(0, 10) : "",
+      buyClose,
+      prevClose: prev ? prev.close : null,
+      t1Date: next1 ? next1.date.slice(0, 10) : "",
+      t1Pct: next1 ? pctFromClose(buyClose, next1.close) : null,
+      t1HigherThanPrevClose: Boolean(next1 && prev && next1.close > prev.close),
+      t2Date: next2 ? next2.date.slice(0, 10) : "",
+      t2Pct: next2 ? pctFromClose(buyClose, next2.close) : null,
+      t2HigherThanBuyClose: Boolean(next2 && next2.close > buyClose),
+      t3Date: next3 ? next3.date.slice(0, 10) : "",
+      t3Pct: next3 ? pctFromClose(buyClose, next3.close) : null,
+      t3HigherThanBuyClose: Boolean(next3 && next3.close > buyClose),
+    };
+  }
+
+  function summarizeBacktestTrades(results) {
+    const trades = results.flatMap((result) => result.trades || []);
+    const horizon = (pctKey, winKey) => {
+      const complete = trades.filter((trade) => Number.isFinite(trade[pctKey]));
+      const wins = complete.filter((trade) => trade[winKey]).length;
+      const avg = complete.length ? complete.reduce((sum, trade) => sum + trade[pctKey], 0) / complete.length : null;
+      return {
+        count: complete.length,
+        winRate: complete.length ? (wins / complete.length) * 100 : null,
+        avgPct: avg,
+      };
+    };
+    return {
+      stockCount: results.length,
+      tradeCount: trades.length,
+      t1: horizon("t1Pct", "t1HigherThanPrevClose"),
+      t2: horizon("t2Pct", "t2HigherThanBuyClose"),
+      t3: horizon("t3Pct", "t3HigherThanBuyClose"),
+    };
+  }
+
   async function backtestQuoteIndicatorPlan(quote, plan) {
     const normalizedPlan = normalizeIndicatorPlan(plan);
     const conditions = (normalizedPlan.conditions || []).filter((condition) => condition && (condition.field || condition.metric));
-    if (!conditions.length) return { quote, dates: [] };
+    if (!conditions.length) return { quote, trades: [] };
     const unsupported = conditions.find((condition) => (condition.period || "day") !== "day");
     if (unsupported) throw new Error("近半年测试目前只支持日K条件");
     const rows = await fetchKlineForPeriod(quote.symbol, "day");
@@ -1771,15 +1820,15 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
     const indicators = [...new Set(conditions.map((condition) => condition.indicator || ""))];
     const getMetrics = createHistoricalMetricGetter(indicators, rows, indexRows, quote);
     const startDate = halfYearStartDate();
-    const dates = [];
+    const trades = [];
     const firstIndex = rows.findIndex((row) => row.date && row.date.slice(0, 10) >= startDate);
     const startIndex = firstIndex >= 0 ? firstIndex : Math.max(0, rows.length - 126);
     for (let index = Math.max(1, startIndex); index < rows.length; index += 1) {
       const metricsByIndicator = {};
       for (const indicator of indicators) metricsByIndicator[indicator] = getMetrics(indicator, index);
-      if (conditions.every((condition) => conditionPassesAtIndex(condition, metricsByIndicator))) dates.push(rows[index].date.slice(0, 10));
+      if (conditions.every((condition) => conditionPassesAtIndex(condition, metricsByIndicator))) trades.push(backtestTradeAt(rows, index));
     }
-    return { quote, dates };
+    return { quote, trades };
   }
 
   function conditionLabel(condition) {
@@ -1871,14 +1920,62 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
     els.indicatorScreenStatus.textContent = `筛选完成：命中 ${matches.length} / ${base.length}${topReasons ? `。未命中主要原因：${topReasons}` : "。"}`;
   }
 
-  function renderBacktestResults(results, limit = 80) {
-    const visible = results.slice(0, limit);
+  function formatBacktestPct(value) {
+    return Number.isFinite(value) ? `${value >= 0 ? "+" : ""}${value.toFixed(2)}%` : "--";
+  }
+
+  function formatBacktestRate(value) {
+    return Number.isFinite(value) ? `${value.toFixed(1)}%` : "--";
+  }
+
+  function backtestPctClass(value) {
+    if (!Number.isFinite(value)) return "";
+    return value >= 0 ? "is-up" : "is-down";
+  }
+
+  function renderBacktestResults(results, limit = 160) {
+    const summary = summarizeBacktestTrades(results);
+    const rows = results.flatMap(({ quote, trades }) =>
+      (trades || []).map((trade) => ({
+        quote,
+        trade,
+      }))
+    );
+    const visible = rows.slice(0, limit);
     els.indicatorBacktestResult.hidden = false;
-    els.indicatorBacktestResult.innerHTML = visible.length
-      ? `<div class="backtest-result-title">近半年历史命中</div>${visible
-          .map(({ quote, dates }) => `<div class="backtest-result-row"><strong>${escapeHtml(quote.name)} ${escapeHtml(quote.code)}</strong><span>${dates.length}次</span><em>${dates.map(escapeHtml).join("、")}</em></div>`)
-          .join("")}${results.length > limit ? `<div class="backtest-result-more">还有 ${results.length - limit} 只股票未展开显示，股票列表中已全部保留。</div>` : ""}`
-      : `<div class="backtest-result-title">近半年历史命中</div><div class="backtest-result-empty">没有股票在近半年内满足当前全部条件。</div>`;
+    els.indicatorBacktestResult.innerHTML = `<div class="backtest-result-title">近半年策略测试报表</div>
+      <div class="backtest-summary">
+        <div><span>命中股票</span><strong>${summary.stockCount}</strong></div>
+        <div><span>命中次数</span><strong>${summary.tradeCount}</strong></div>
+        <div><span>T+1胜率</span><strong>${formatBacktestRate(summary.t1.winRate)}</strong><em>均值 ${formatBacktestPct(summary.t1.avgPct)}</em></div>
+        <div><span>T+2胜率</span><strong>${formatBacktestRate(summary.t2.winRate)}</strong><em>均值 ${formatBacktestPct(summary.t2.avgPct)}</em></div>
+        <div><span>T+3胜率</span><strong>${formatBacktestRate(summary.t3.winRate)}</strong><em>均值 ${formatBacktestPct(summary.t3.avgPct)}</em></div>
+      </div>
+      ${
+        visible.length
+          ? `<div class="backtest-table-wrap"><table class="backtest-table">
+              <thead><tr><th>股票</th><th>信号日</th><th>买入收盘</th><th>T+1日期</th><th>T+1涨跌幅</th><th>T+1高于前收</th><th>T+2日期</th><th>T+2涨跌幅</th><th>T+2高于买收</th><th>T+3日期</th><th>T+3涨跌幅</th><th>T+3高于买收</th></tr></thead>
+              <tbody>${visible
+                .map(
+                  ({ quote, trade }) => `<tr>
+                    <td>${escapeHtml(quote.name)} ${escapeHtml(quote.code)}</td>
+                    <td>${escapeHtml(trade.date)}</td>
+                    <td>${Number.isFinite(trade.buyClose) ? trade.buyClose.toFixed(2) : "--"}</td>
+                    <td>${escapeHtml(trade.t1Date || "--")}</td>
+                    <td class="${backtestPctClass(trade.t1Pct)}">${formatBacktestPct(trade.t1Pct)}</td>
+                    <td>${Number.isFinite(trade.t1Pct) ? (trade.t1HigherThanPrevClose ? "是" : "否") : "--"}</td>
+                    <td>${escapeHtml(trade.t2Date || "--")}</td>
+                    <td class="${backtestPctClass(trade.t2Pct)}">${formatBacktestPct(trade.t2Pct)}</td>
+                    <td>${Number.isFinite(trade.t2Pct) ? (trade.t2HigherThanBuyClose ? "是" : "否") : "--"}</td>
+                    <td>${escapeHtml(trade.t3Date || "--")}</td>
+                    <td class="${backtestPctClass(trade.t3Pct)}">${formatBacktestPct(trade.t3Pct)}</td>
+                    <td>${Number.isFinite(trade.t3Pct) ? (trade.t3HigherThanBuyClose ? "是" : "否") : "--"}</td>
+                  </tr>`
+                )
+                .join("")}</tbody>
+            </table></div>${rows.length > limit ? `<div class="backtest-result-more">还有 ${rows.length - limit} 条命中记录未展开显示，股票列表中已保留全部命中股票。</div>` : ""}`
+          : `<div class="backtest-result-empty">没有股票在近半年内满足当前全部条件。</div>`
+      }`;
   }
 
   async function runIndicatorBacktest() {
@@ -1919,7 +2016,7 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
         const quote = base[index];
         try {
           const result = await backtestQuoteIndicatorPlan(quote, normalizedPlan);
-          if (result.dates.length) {
+          if (result.trades.length) {
             results.push(result);
             matchedQuotes.push(quote);
           }
@@ -1931,7 +2028,8 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
         completed += 1;
         if (completed % 12 === 0 || completed === base.length) {
           publish();
-          els.indicatorScreenStatus.textContent = `近半年测试中 ${completed}/${base.length}，已有 ${results.length} 只股票曾经满足，K线失败 ${failed}`;
+          const tradeCount = results.reduce((sum, result) => sum + result.trades.length, 0);
+          els.indicatorScreenStatus.textContent = `近半年测试中 ${completed}/${base.length}，已有 ${results.length} 只股票、${tradeCount} 次命中，K线失败 ${failed}`;
           await new Promise((resolve) => setTimeout(resolve, 0));
         }
       }
@@ -1939,7 +2037,7 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
     await Promise.all(workers);
     els.backtestIndicatorPlanButton.disabled = false;
     els.runIndicatorScreenButton.disabled = false;
-    results.sort((a, b) => b.dates.length - a.dates.length || a.quote.code.localeCompare(b.quote.code));
+    results.sort((a, b) => b.trades.length - a.trades.length || a.quote.code.localeCompare(b.quote.code));
     state.filtered = results.map((result) => result.quote);
     state.currentPage = 1;
     sortFiltered();
@@ -1950,7 +2048,8 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
       .slice(0, 2)
       .map(([label, count]) => `${label}：${count}`)
       .join("；");
-    els.indicatorScreenStatus.textContent = `近半年测试完成：${results.length} 只股票曾经满足当前全部条件；列表已显示这些股票${failed ? `；另有 ${failed} 只K线失败未参与判断${topKlineErrors ? `（${topKlineErrors}）` : ""}` : ""}。`;
+    const summary = summarizeBacktestTrades(results);
+    els.indicatorScreenStatus.textContent = `近半年测试完成：${summary.stockCount} 只股票、${summary.tradeCount} 次命中；T+1胜率 ${formatBacktestRate(summary.t1.winRate)}，均值 ${formatBacktestPct(summary.t1.avgPct)}；T+2胜率 ${formatBacktestRate(summary.t2.winRate)}，均值 ${formatBacktestPct(summary.t2.avgPct)}；T+3胜率 ${formatBacktestRate(summary.t3.winRate)}，均值 ${formatBacktestPct(summary.t3.avgPct)}${failed ? `；另有 ${failed} 只K线失败未参与判断${topKlineErrors ? `（${topKlineErrors}）` : ""}` : ""}。`;
   }
 
   function renderQuoteHead() {
@@ -3866,6 +3965,6 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
   updateMaFilterLabel();
   bindEvents();
   renderQuoteTable();
-  window.aShareAnalyzer = { fetchQuotes, parseTencentQuote, quoteMatches, fetchKline, fetchKlineForPeriod, quotePassesIndicatorPlan, executeFormula, calculateMainForce, evaluateIndicatorPlan, collectIndicatorMetrics, defaultIndicatorPlan: DEFAULT_INDICATOR_PLAN, mainForceFormula: MAIN_FORCE_FORMULA, debugState: () => state };
+  window.aShareAnalyzer = { fetchQuotes, parseTencentQuote, quoteMatches, fetchKline, fetchKlineForPeriod, quotePassesIndicatorPlan, executeFormula, calculateMainForce, evaluateIndicatorPlan, collectIndicatorMetrics, summarizeBacktestTrades, defaultIndicatorPlan: DEFAULT_INDICATOR_PLAN, mainForceFormula: MAIN_FORCE_FORMULA, debugState: () => state };
 })();
 

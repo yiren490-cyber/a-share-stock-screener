@@ -72,11 +72,12 @@ sandbox.window.localStorage = sandbox.localStorage;
 vm.createContext(sandbox);
 vm.runInContext(appSource, sandbox);
 
-const { evaluateIndicatorPlan, parseTencentQuote, quoteMatches } = sandbox.window.aShareAnalyzer;
+const { evaluateIndicatorPlan, parseTencentQuote, quoteMatches, summarizeBacktestTrades } = sandbox.window.aShareAnalyzer;
 
 assert.strictEqual(typeof evaluateIndicatorPlan, "function", "evaluateIndicatorPlan should be exported");
 assert.strictEqual(typeof parseTencentQuote, "function", "parseTencentQuote should be exported");
 assert.strictEqual(typeof quoteMatches, "function", "quoteMatches should be exported");
+assert.strictEqual(typeof summarizeBacktestTrades, "function", "summarizeBacktestTrades should be exported");
 
 function quoteLine(symbol, name, code) {
   const fields = Array.from({ length: 50 }, () => "");
@@ -167,5 +168,37 @@ assert.strictEqual(
   ).passed,
   true
 );
+
+const backtestSummary = summarizeBacktestTrades([
+  {
+    quote: { code: "000001", name: "平安银行" },
+    trades: [
+      {
+        t1Pct: 2,
+        t1HigherThanPrevClose: true,
+        t2Pct: -1,
+        t2HigherThanBuyClose: false,
+        t3Pct: 3,
+        t3HigherThanBuyClose: true,
+      },
+      {
+        t1Pct: -2,
+        t1HigherThanPrevClose: false,
+        t2Pct: 4,
+        t2HigherThanBuyClose: true,
+        t3Pct: null,
+        t3HigherThanBuyClose: false,
+      },
+    ],
+  },
+]);
+assert.strictEqual(backtestSummary.stockCount, 1);
+assert.strictEqual(backtestSummary.tradeCount, 2);
+assert.strictEqual(backtestSummary.t1.winRate, 50);
+assert.strictEqual(backtestSummary.t1.avgPct, 0);
+assert.strictEqual(backtestSummary.t2.winRate, 50);
+assert.strictEqual(backtestSummary.t2.avgPct, 1.5);
+assert.strictEqual(backtestSummary.t3.winRate, 100);
+assert.strictEqual(backtestSummary.t3.avgPct, 3);
 
 console.log("indicator-screening tests passed");
