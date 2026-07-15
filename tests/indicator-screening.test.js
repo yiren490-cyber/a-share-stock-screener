@@ -175,7 +175,7 @@ const backtestSummary = summarizeBacktestTrades([
     trades: [
       {
         t1Pct: 2,
-        t1HigherThanPrevClose: true,
+        t1HigherThanBuyClose: true,
         t2Pct: -1,
         t2HigherThanBuyClose: false,
         t3Pct: 3,
@@ -183,7 +183,7 @@ const backtestSummary = summarizeBacktestTrades([
       },
       {
         t1Pct: -2,
-        t1HigherThanPrevClose: false,
+        t1HigherThanBuyClose: false,
         t2Pct: 4,
         t2HigherThanBuyClose: true,
         t3Pct: null,

@@ -289,6 +289,7 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
     runIndicatorScreenButton: document.getElementById("runIndicatorScreenButton"),
     backtestIndicatorPlanButton: document.getElementById("backtestIndicatorPlanButton"),
     openBacktestReportButton: document.getElementById("openBacktestReportButton"),
+    exportBacktestReportActionButton: document.getElementById("exportBacktestReportActionButton"),
     deleteIndicatorPlanButton: document.getElementById("deleteIndicatorPlanButton"),
     indicatorPlanName: document.getElementById("indicatorPlanName"),
     indicatorPlanSelect: document.getElementById("indicatorPlanSelect"),
@@ -1779,7 +1780,7 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
       low: row.low,
       close: row.close,
       pct: pctFromClose(buyClose, row.close),
-      higherThanCompare: Number.isFinite(compareClose) && row.close > compareClose,
+      higherThanCompare: Number.isFinite(compareClose) && row.open > compareClose,
     };
   }
 
@@ -1790,7 +1791,7 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
     const next2 = rows[index + 2];
     const next3 = rows[index + 3];
     const buyClose = current ? current.close : null;
-    const t1 = backtestFutureDay(next1, buyClose, prev ? prev.close : null);
+    const t1 = backtestFutureDay(next1, buyClose, buyClose);
     const t2 = backtestFutureDay(next2, buyClose, buyClose);
     const t3 = backtestFutureDay(next3, buyClose, buyClose);
     return {
@@ -1803,7 +1804,7 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
       t1Low: t1.low,
       t1Close: t1.close,
       t1Pct: t1.pct,
-      t1HigherThanPrevClose: t1.higherThanCompare,
+      t1HigherThanBuyClose: t1.higherThanCompare,
       t2Date: t2.date,
       t2Open: t2.open,
       t2High: t2.high,
@@ -1836,7 +1837,7 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
     return {
       stockCount: results.length,
       tradeCount: trades.length,
-      t1: horizon("t1Pct", "t1HigherThanPrevClose"),
+      t1: horizon("t1Pct", "t1HigherThanBuyClose"),
       t2: horizon("t2Pct", "t2HigherThanBuyClose"),
       t3: horizon("t3Pct", "t3HigherThanBuyClose"),
     };
@@ -1972,7 +1973,7 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
   }
 
   function backtestTableHead() {
-    return `<thead><tr><th>股票</th><th>信号日</th><th>买入收盘</th><th>T+1日期</th><th>T+1开</th><th>T+1高</th><th>T+1低</th><th>T+1收</th><th>T+1涨跌幅</th><th>T+1高于前收</th><th>T+2日期</th><th>T+2开</th><th>T+2高</th><th>T+2低</th><th>T+2收</th><th>T+2涨跌幅</th><th>T+2高于买收</th><th>T+3日期</th><th>T+3开</th><th>T+3高</th><th>T+3低</th><th>T+3收</th><th>T+3涨跌幅</th><th>T+3高于买收</th></tr></thead>`;
+    return `<thead><tr><th>股票</th><th>信号日</th><th>买入收盘</th><th>T+1日期</th><th>T+1开</th><th>T+1高</th><th>T+1低</th><th>T+1收</th><th>T+1涨跌幅</th><th>T+1开盘高于买收</th><th>T+2日期</th><th>T+2开</th><th>T+2高</th><th>T+2低</th><th>T+2收</th><th>T+2涨跌幅</th><th>T+2开盘高于买收</th><th>T+3日期</th><th>T+3开</th><th>T+3高</th><th>T+3低</th><th>T+3收</th><th>T+3涨跌幅</th><th>T+3开盘高于买收</th></tr></thead>`;
   }
 
   function backtestTradeRow(quote, trade) {
@@ -1986,7 +1987,7 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
       <td>${formatBacktestPrice(trade.t1Low)}</td>
       <td>${formatBacktestPrice(trade.t1Close)}</td>
       <td class="${backtestPctClass(trade.t1Pct)}">${formatBacktestPct(trade.t1Pct)}</td>
-      <td>${Number.isFinite(trade.t1Pct) ? (trade.t1HigherThanPrevClose ? "是" : "否") : "--"}</td>
+      <td>${Number.isFinite(trade.t1Pct) ? (trade.t1HigherThanBuyClose ? "是" : "否") : "--"}</td>
       <td>${escapeHtml(trade.t2Date || "--")}</td>
       <td>${formatBacktestPrice(trade.t2Open)}</td>
       <td>${formatBacktestPrice(trade.t2High)}</td>
@@ -2049,7 +2050,7 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
   function downloadBacktestReport() {
     const results = state.backtestResults || [];
     const summary = summarizeBacktestTrades(results);
-    const header = ["股票名称", "股票代码", "信号日", "买入收盘价", "T+1日期", "T+1开盘", "T+1最高", "T+1最低", "T+1收盘", "T+1涨跌幅", "T+1是否高于前收", "T+2日期", "T+2开盘", "T+2最高", "T+2最低", "T+2收盘", "T+2涨跌幅", "T+2是否高于买收", "T+3日期", "T+3开盘", "T+3最高", "T+3最低", "T+3收盘", "T+3涨跌幅", "T+3是否高于买收"];
+    const header = ["股票名称", "股票代码", "信号日", "买入收盘价", "T+1日期", "T+1开盘", "T+1最高", "T+1最低", "T+1收盘", "T+1涨跌幅", "T+1开盘是否高于买收", "T+2日期", "T+2开盘", "T+2最高", "T+2最低", "T+2收盘", "T+2涨跌幅", "T+2开盘是否高于买收", "T+3日期", "T+3开盘", "T+3最高", "T+3最低", "T+3收盘", "T+3涨跌幅", "T+3开盘是否高于买收"];
     const summaryRows = [
       ["汇总", "命中股票", summary.stockCount],
       ["汇总", "总命中次数", summary.tradeCount],
@@ -2070,7 +2071,7 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
         formatBacktestPrice(trade.t1Low),
         formatBacktestPrice(trade.t1Close),
         formatBacktestPct(trade.t1Pct),
-        Number.isFinite(trade.t1Pct) ? (trade.t1HigherThanPrevClose ? "是" : "否") : "",
+        Number.isFinite(trade.t1Pct) ? (trade.t1HigherThanBuyClose ? "是" : "否") : "",
         trade.t2Date || "",
         formatBacktestPrice(trade.t2Open),
         formatBacktestPrice(trade.t2High),
@@ -2123,6 +2124,7 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
     els.backtestIndicatorPlanButton.disabled = true;
     els.runIndicatorScreenButton.disabled = true;
     els.openBacktestReportButton.hidden = true;
+    els.exportBacktestReportActionButton.hidden = true;
     els.indicatorBacktestResult.hidden = true;
     els.indicatorBacktestResult.innerHTML = "";
     els.indicatorScreenStatus.textContent = `开始近半年测试：${normalizedPlan.name}，共 ${base.length} 只股票，并发 ${workerCount}。`;
@@ -2154,6 +2156,7 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
     results.sort((a, b) => b.trades.length - a.trades.length || a.quote.code.localeCompare(b.quote.code));
     state.backtestResults = results;
     els.openBacktestReportButton.hidden = false;
+    els.exportBacktestReportActionButton.hidden = false;
     renderBacktestResults(results);
     openBacktestReport();
     const topKlineErrors = [...klineErrors.entries()]
@@ -3956,6 +3959,7 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
     els.openBacktestReportButton.addEventListener("click", openBacktestReport);
     els.closeBacktestReportButton.addEventListener("click", closeBacktestReport);
     els.exportBacktestReportButton.addEventListener("click", downloadBacktestReport);
+    els.exportBacktestReportActionButton.addEventListener("click", downloadBacktestReport);
     els.backtestReportModal.addEventListener("click", (event) => {
       if (event.target === els.backtestReportModal) closeBacktestReport();
     });
