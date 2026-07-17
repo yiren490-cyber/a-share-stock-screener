@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>A股实时盯盘</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="assets/styles.css" />
+  </head>
+  <body class="watch-page">
+    <main class="watch-shell">
+      <section class="watch-topbar">
+        <div class="watch-brand">
+          <h1>A股实时盯盘</h1>
+          <p id="watchStatus">输入股票代码，或从已有分组中选择股票。</p>
+        </div>
+        <div class="watch-controls">
+          <label class="watch-symbol-field">
+            <span>股票代码</span>
+            <input id="watchSymbolInput" type="search" placeholder="600519 / sh600519" />
+            <div id="watchSearchHistory" class="watch-search-history"></div>
+          </label>
+          <button id="watchLoadButton" type="button">载入</button>
+          <button id="watchPrevButton" type="button" disabled>上一只</button>
+          <button id="watchNextButton" type="button" disabled>下一只</button>
+          <a class="watch-link-button" href="index.html">返回筛选器</a>
+        </div>
+        <div class="watch-alerts" id="alertLights" aria-label="预警灯">
+          <div class="watch-alert-light" data-alert="minuteKdj"><span></span><strong>1分钟 KDJ&gt;80</strong></div>
+          <div class="watch-alert-light" data-alert="fiveMinuteBoll"><span></span><strong>5分钟 突破BOLL</strong></div>
+          <div class="watch-alert-light" data-alert="dayBoll"><span></span><strong>日K 突破BOLL</strong></div>
+        </div>
+      </section>
+
+      <section class="watch-audio-bar">
+        <button id="enableSoundButton" type="button">启用声音</button>
+        <label>
+          <span>上传预警音频</span>
+          <input id="alertAudioInput" type="file" accept="audio/*" />
+        </label>
+        <span id="audioStatus">默认提示音</span>
+        <button id="watchRefreshButton" class="watch-realtime-button" type="button">实时刷新</button>
+      </section>
+
+      <section class="watch-main-grid">
+        <aside class="watch-category-panel">
+          <h2>股票分组</h2>
+          <div id="watchCategoryList" class="watch-category-list"></div>
+        </aside>
+
+        <section class="watch-realtime-panel">
+          <div class="watch-section-header">
+            <div>
+              <h2 id="watchStockTitle">未选择股票</h2>
+              <p id="watchStockMeta">--</p>
+            </div>
+            <div id="watchPriceBadge" class="watch-price-badge">--</div>
+          </div>
+          <div class="watch-realtime-grid">
+            <div class="watch-chart-card watch-intraday-card">
+              <h3>分时图</h3>
+              <div id="intradayInfo" class="watch-chart-info">--</div>
+              <svg id="intradayChart" role="img" aria-label="分时图"></svg>
+            </div>
+            <div class="watch-order-card">
+              <div id="orderBook" class="watch-order-book"></div>
+            </div>
+          </div>
+        </section>
+      </section>
+
+      <section class="watch-zoom-bar" aria-label="K线缩放">
+        <span id="watchZoomStatus">K线数量：120</span>
+        <button id="watchZoomInButton" type="button">放大</button>
+        <button id="watchZoomOutButton" type="button">缩小</button>
+        <button id="watchZoomResetButton" type="button">重置</button>
+      </section>
+      <section id="periodPanels" class="watch-period-grid" aria-label="周期图"></section>
+    </main>
+
+    <script src="assets/listing-dates.js"></script>
+    <script src="assets/watch.js"></script>
+    <script>
+      window.stockWatch.initWatchPage(document);
+    </script>
+  </body>
+</html>

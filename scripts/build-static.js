@@ -19,6 +19,7 @@ function copyRecursive(source, target) {
 }
 
 copyRecursive(path.join(root, "index.html"), path.join(dist, "index.html"));
+copyRecursive(path.join(root, "watch.html"), path.join(dist, "watch.html"));
 copyRecursive(path.join(root, "assets"), path.join(dist, "assets"));
 copyRecursive(path.join(root, ".openai"), path.join(dist, ".openai"));
 
@@ -28,6 +29,7 @@ function addDeployAsset(urlPath, filePath) {
 }
 addDeployAsset("/", path.join(root, "index.html"));
 addDeployAsset("/index.html", path.join(root, "index.html"));
+addDeployAsset("/watch.html", path.join(root, "watch.html"));
 fs.readdirSync(path.join(root, "assets")).forEach((entry) => {
   if (entry.endsWith(".backup")) return;
   const filePath = path.join(root, "assets", entry);
