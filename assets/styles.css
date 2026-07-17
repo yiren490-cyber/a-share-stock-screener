@@ -1376,6 +1376,16 @@ svg {
   border-color: #1d4ed8;
 }
 
+#enableSoundButton {
+  background: #1d4ed8;
+  border-color: #1d4ed8;
+}
+
+#enableSoundButton.is-on {
+  background: #dc2626;
+  border-color: #dc2626;
+}
+
 #watchBannerButton {
   background: #1d4ed8;
   border-color: #1d4ed8;

@@ -434,6 +434,7 @@
       soundEnabled: false,
       uploadedAudioUrl: "",
       uploadedAudioObjectUrl: "",
+      audioReadyPromise: null,
       alertAudio: null,
       alertToneTimer: null,
       alertLoopActive: false,
@@ -453,7 +454,7 @@
     renderSearchHistory(state, els);
     renderBannerList(state, els);
     bindWatchEvents(state, els);
-    loadStoredAudio(state, els);
+    state.audioReadyPromise = loadStoredAudio(state, els);
     const lastSymbol = normalizeSymbol(root.localStorage.getItem(LAST_SYMBOL_KEY) || "");
     if (lastSymbol) loadSymbol(state, els, lastSymbol, state.categoryName);
   }
@@ -507,8 +508,8 @@
       const nav = makeCategoryNavigator(state.categories, state.categoryName, state.symbol);
       if (nav.next) loadSymbol(state, els, nav.next, state.categoryName);
     });
-    els.enableSoundButton.addEventListener("click", () => {
-      setSoundEnabled(state, els, !state.soundEnabled);
+    els.enableSoundButton.addEventListener("click", async () => {
+      await setSoundEnabled(state, els, !state.soundEnabled);
     });
     els.alertAudioInput.addEventListener("change", () => handleAudioUpload(state, els));
     els.bannerButton.addEventListener("click", () => openBannerModal(els));
@@ -1304,6 +1305,11 @@
     return 132;
   }
 
+  function renderKlineInfo(row) {
+    if (!row) return "等待数据";
+    return `${row.date}  收:${formatNumber(row.close)}  开:${formatNumber(row.open)}  低:${formatNumber(row.low)}  高:${formatNumber(row.high)}`;
+  }
+
   function drawKlineChart(svg, rows, mode, info, hoverDate, visibleBars) {
     if (!svg) return;
     const w = 560;
@@ -1354,9 +1360,7 @@
       ${candles}${overlays}${crosshair}
       <text x="2" y="${pad.top + 8}" fill="#64748b" font-size="9">${scale.max.toFixed(2)}</text>
       <text x="2" y="${h - pad.bottom}" fill="#64748b" font-size="9">${scale.min.toFixed(2)}</text>`;
-    const last = hoverRow || rows[rows.length - 1];
-    const lastBoll = boll[boll.length - 1] || {};
-    if (info) info.textContent = `${last.date}  收:${formatNumber(last.close)}  ${mode === "boll" ? `UB:${formatNumber(lastBoll.ub)}` : `MA5:${formatNumber(ma5[ma5.length - 1])}`}`;
+    if (info) info.textContent = renderKlineInfo(hoverRow || rows[rows.length - 1]);
   }
 
   function drawVolumeChart(svg, rows, hoverDate, visibleBars) {
@@ -1484,9 +1488,13 @@
     updateAlertBanner(state, els);
   }
 
-  function setSoundEnabled(state, els, enabled) {
+  async function setSoundEnabled(state, els, enabled) {
+    if (enabled && state.audioReadyPromise) await state.audioReadyPromise;
     state.soundEnabled = Boolean(enabled);
-    if (els.enableSoundButton) els.enableSoundButton.textContent = state.soundEnabled ? "关闭音频" : "启用声音";
+    if (els.enableSoundButton) {
+      els.enableSoundButton.textContent = state.soundEnabled ? "关闭预警音频" : "启用预警音频";
+      els.enableSoundButton.classList.toggle("is-on", state.soundEnabled);
+    }
     if (!state.soundEnabled) {
       stopAlertLoop(state);
       updateAlertBanner(state, els);
@@ -1546,11 +1554,13 @@
   async function handleAudioUpload(state, els) {
     const file = els.alertAudioInput.files && els.alertAudioInput.files[0];
     if (!file) return;
+    if (state.audioReadyPromise) await state.audioReadyPromise;
     const wasLooping = state.alertLoopActive;
     stopAlertLoop(state);
     setUploadedAudioUrl(state, root.URL && root.URL.createObjectURL ? root.URL.createObjectURL(file) : "");
     try {
       await saveAudioToDb(file);
+      state.audioReadyPromise = Promise.resolve();
     } catch (_) {
       try {
         const dataUrl = await readFileAsDataUrl(file);
@@ -1559,6 +1569,7 @@
       } catch (error) {}
     }
     if (wasLooping || (state.soundEnabled && state.previousAlertCount >= 2)) startAlertLoop(state);
+    updateStoredAudioMarker(state, els);
   }
 
   function setUploadedAudioUrl(state, url) {
@@ -1605,15 +1616,18 @@
       if (result) {
         if (typeof result === "string") {
           setUploadedAudioUrl(state, result);
+          updateStoredAudioMarker(state, els);
           return;
         }
         if (result.buffer && root.Blob && root.URL && root.URL.createObjectURL) {
           const blob = new root.Blob([result.buffer], { type: result.type || "audio/mpeg" });
           setUploadedAudioUrl(state, root.URL.createObjectURL(blob));
+          updateStoredAudioMarker(state, els);
           return;
         }
         if (result.blob && root.URL && root.URL.createObjectURL) {
           setUploadedAudioUrl(state, root.URL.createObjectURL(result.blob));
+          updateStoredAudioMarker(state, els);
           return;
         }
       }
@@ -1624,8 +1638,18 @@
       const sessionAudio = root.sessionStorage && root.sessionStorage.getItem("stockWatchSessionAudio");
       if (sessionAudio) {
         setUploadedAudioUrl(state, sessionAudio);
+        updateStoredAudioMarker(state, els);
       }
     }
+    updateStoredAudioMarker(state, els);
+  }
+
+  function updateStoredAudioMarker(state, els) {
+    if (els && els.audioStatus) els.audioStatus.dataset.savedAudio = hasStoredAlertAudio(state) ? "true" : "false";
+  }
+
+  function hasStoredAlertAudio(state) {
+    return Boolean(state && state.uploadedAudioUrl);
   }
 
   async function readAudioFromDb() {
@@ -1668,6 +1692,7 @@
     recentTradeRows,
     renderOrderBookHtml,
     renderIntradayInfoHtml,
+    renderKlineInfo,
     normalizeSearchHistory,
     readSearchHistory,
     addSearchHistory,
@@ -1679,6 +1704,7 @@
     intradaySlotMax,
     intradayPriceValues,
     drawIntradayChart,
+    hasStoredAlertAudio,
     initWatchPage,
   };
 });

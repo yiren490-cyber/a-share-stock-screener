@@ -221,5 +221,9 @@ assert(intradayInfo.includes("2026-07-17 09:30"));
 assert(intradayInfo.includes("价:10.00"));
 assert(intradayInfo.includes('<span class="watch-pct is-up">涨幅:1.25%</span>'));
 assert(intradayInfo.includes("均价:9.90"));
+assert.strictEqual(watch.renderKlineInfo({ date: "2026-07-17 13:30", open: 31.8, close: 32.23, low: 31.5, high: 32.8 }), "2026-07-17 13:30  收:32.23  开:31.80  低:31.50  高:32.80");
+assert.strictEqual(watch.renderKlineInfo(null), "等待数据");
+assert.strictEqual(watch.hasStoredAlertAudio({ uploadedAudioUrl: "blob:http://local/audio" }), true);
+assert.strictEqual(watch.hasStoredAlertAudio({ uploadedAudioUrl: "" }), false);
 
 console.log("watch helper tests passed");
