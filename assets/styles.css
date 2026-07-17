@@ -1391,17 +1391,28 @@ svg {
   border-color: #1d4ed8;
 }
 
-.watch-audio-bar label {
+.watch-audio-bar .watch-upload-audio-button {
   display: flex;
-  grid-template-columns: none;
   align-items: center;
-  gap: 8px;
+  justify-content: center;
+  height: 38px;
+  padding: 0 14px;
+  border: 1px solid #1d4ed8;
+  border-radius: 6px;
+  background: #1d4ed8;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
 }
 
-.watch-audio-bar input {
-  height: auto;
-  padding: 0;
-  border: 0;
+.watch-audio-bar .watch-upload-audio-button input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
 }
 
 .watch-audio-bar select {
@@ -1905,12 +1916,8 @@ svg {
     margin-left: 0;
   }
 
-  .watch-audio-bar label {
-    display: grid;
-    gap: 6px;
-  }
-
-  .watch-audio-bar input {
-    max-width: 100%;
+  .watch-audio-bar .watch-upload-audio-button,
+  .watch-audio-bar select {
+    width: 100%;
   }
 }
