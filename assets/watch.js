@@ -984,11 +984,16 @@
   function intradayLayout() {
     const w = 900;
     const h = 360;
-    const pad = { left: 22, right: 8, top: 16, bottom: 30 };
+    const pad = { left: 46, right: 2, top: 16, bottom: 30 };
     const priceBottom = h - pad.bottom - 8;
     const volumeHeight = 205;
     const volumeTop = h - pad.bottom - volumeHeight;
     return { w, h, pad, priceBottom, volumeTop, volumeHeight };
+  }
+
+  function intradaySlotMax(plottedRows) {
+    const slots = (plottedRows || []).map((row) => Number(row.slot)).filter(Number.isFinite);
+    return slots.length ? Math.max(1, ...slots) : 240;
   }
 
   function drawIntradayChart(svg, rows, info, quote, hoverDate, onHover) {
@@ -1012,9 +1017,10 @@
     });
     const lastAverage = averageRows.length ? averageRows[averageRows.length - 1].value : null;
     const priceScale = chartScale(plotted.flatMap((row) => [row.close, quote && quote.prevClose, lastAverage]).filter((value) => value !== null), pad.top, priceBottom);
+    const slotMax = intradaySlotMax(plotted);
     const maxVolume = Math.max(...rows.map((row) => row.volume || 0), 1);
-    const barW = Math.max(2, (w - pad.left - pad.right) / 240 - 1);
-    const xForSlot = (slot) => pad.left + (slot / 240) * (w - pad.left - pad.right);
+    const barW = Math.max(2, (w - pad.left - pad.right) / slotMax - 1);
+    const xForSlot = (slot) => pad.left + (Math.min(slot, slotMax) / slotMax) * (w - pad.left - pad.right);
     const sessionLine = (items) => {
       const points = items.map((item) => `${xForSlot(item.slot).toFixed(2)},${priceScale.y(item.value).toFixed(2)}`);
       return points.length ? `M ${points.join(" L ")}` : "";
@@ -1037,6 +1043,7 @@
       { label: "14:00", slot: 180 },
       { label: "15:00", slot: 240 },
     ]
+      .filter((tick) => tick.slot <= slotMax)
       .map((tick) => {
         const x = xForSlot(tick.slot);
         return `<line x1="${x}" y1="${pad.top}" x2="${x}" y2="${h - pad.bottom}" stroke="#eef2f7" />
@@ -1044,6 +1051,7 @@
       })
       .join("");
     svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+    svg.setAttribute("preserveAspectRatio", "none");
     const explicitHoverSlotRaw = minuteToTradingSlot(hoverDate);
     const explicitHoverSlot = explicitHoverSlotRaw === null ? null : clampSlotToDataRange(explicitHoverSlotRaw, plotted);
     const hoverIndex = hoverDate ? nearestIndexForDate(plotted, hoverDate) : plotted.length - 1;
@@ -1064,15 +1072,15 @@
       <line x1="${pad.left}" y1="${volumeTop}" x2="${w - pad.right}" y2="${volumeTop}" stroke="#dfe5ec" stroke-dasharray="4 4" />
       <line x1="${pad.left}" y1="${h - pad.bottom}" x2="${w - pad.right}" y2="${h - pad.bottom}" stroke="#dfe5ec" />
       ${prevY ? `<line x1="${pad.left}" y1="${prevY}" x2="${w - pad.right}" y2="${prevY}" stroke="#dc2626" stroke-dasharray="4 4" />
-      <text x="8" y="${prevY + 4}" fill="#dc2626" font-size="11">${formatNumber(quote.prevClose)} 0.00%</text>` : ""}
+      <text x="${pad.left - 4}" y="${prevY + 4}" fill="#dc2626" font-size="11" text-anchor="end">${formatNumber(quote.prevClose)}</text>` : ""}
       <path d="${priceLine}" fill="none" stroke="#1d4ed8" stroke-width="1.8" />
       <path d="${averageLine}" fill="none" stroke="#f59e0b" stroke-width="1.3" />
       ${volumeBars}
       ${crosshair}
-      <text x="8" y="${pad.top + 10}" fill="#64748b" font-size="11">${priceScale.max.toFixed(2)}</text>
-      <text x="8" y="${volumeTop}" fill="#64748b" font-size="11">${priceScale.min.toFixed(2)}</text>
-      <text x="8" y="${h - pad.bottom - 4}" fill="#64748b" font-size="11">量</text>
-      <rect data-hit-area="intraday" x="0" y="${pad.top}" width="${w}" height="${h - pad.top - pad.bottom}" fill="transparent" />`;
+      <text x="${pad.left - 4}" y="${pad.top + 10}" fill="#64748b" font-size="11" text-anchor="end">${priceScale.max.toFixed(2)}</text>
+      <text x="${pad.left - 4}" y="${volumeTop}" fill="#64748b" font-size="11" text-anchor="end">${priceScale.min.toFixed(2)}</text>
+      <text x="${pad.left - 4}" y="${h - pad.bottom - 4}" fill="#64748b" font-size="11" text-anchor="end">量</text>
+      <rect data-hit-area="intraday" x="${pad.left}" y="${pad.top}" width="${w - pad.left - pad.right}" height="${h - pad.top - pad.bottom}" fill="transparent" />`;
     const displayTime = hoverSlot !== null ? `${hoverRow.date.slice(0, 10)} ${slotToTradingTime(hoverSlot)}` : hoverRow && hoverRow.date;
     if (info && hoverRow) {
       info.classList.remove("is-up", "is-down");
@@ -1088,7 +1096,7 @@
       svg.onmousemove = (event) => {
         const rect = svg.getBoundingClientRect();
         const x = ((event.clientX - rect.left) / rect.width) * w;
-        const rawSlot = Math.max(0, Math.min(240, ((x - pad.left) / (w - pad.left - pad.right)) * 240));
+        const rawSlot = Math.max(0, Math.min(slotMax, ((x - pad.left) / (w - pad.left - pad.right)) * slotMax));
         const slot = clampSlotToDataRange(rawSlot, plotted);
         const nearest = plotted.reduce((best, row) => (Math.abs(row.slot - slot) < Math.abs(best.slot - slot) ? row : best), plotted[0]);
         if (nearest) onHover({ ...nearest, date: `${nearest.date.slice(0, 10)} ${slotToTradingTime(slot)}` });
@@ -1444,6 +1452,7 @@
     removeSearchHistory,
     scaleDomain,
     intradayLayout,
+    intradaySlotMax,
     initWatchPage,
   };
 });

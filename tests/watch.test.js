@@ -178,10 +178,12 @@ const macdDomain = watch.scaleDomain([0.02, 0.03, -0.01, 0], 0.08);
 assert(macdDomain.min < -0.01 && macdDomain.max > 0.03, "MACD domain should include zero with padding");
 
 const intradayLayout = watch.intradayLayout();
-assert(intradayLayout.pad.left <= 24, "intraday chart should not waste wide left padding");
+assert(intradayLayout.pad.left <= 52, "intraday chart should keep only enough left padding for price labels");
 assert(intradayLayout.pad.right <= 10, "intraday chart should not waste wide right padding");
 assert(intradayLayout.volumeHeight >= 200, "intraday volume area should be tall enough to read");
 assert(intradayLayout.volumeTop < intradayLayout.priceBottom, "intraday volume can overlap the price area");
+assert.strictEqual(watch.intradaySlotMax([{ slot: 0 }, { slot: 60 }, { slot: 135 }]), 135);
+assert.strictEqual(watch.intradaySlotMax([]), 240);
 
 const intradayInfo = watch.renderIntradayInfoHtml({
   time: "2026-07-17 09:30",
