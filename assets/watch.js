@@ -541,12 +541,23 @@
       els.searchHistory.innerHTML = '<span class="watch-search-empty">暂无搜索记录</span>';
       return;
     }
-    els.searchHistory.innerHTML = state.searchHistory
-      .map(
-        (item) =>
-          `<span class="watch-history-item"><button type="button" data-history-symbol="${item.symbol}"><strong>${escapeHtml(item.name)}</strong><em>${item.symbol.slice(2)}</em></button><button class="watch-history-remove" type="button" aria-label="删除${escapeHtml(item.name)}" data-history-remove="${item.symbol}">×</button></span>`
-      )
-      .join("");
+    els.searchHistory.innerHTML =
+      '<button class="watch-history-clear" type="button">全部删除</button>' +
+      state.searchHistory
+        .map(
+          (item) =>
+            `<span class="watch-history-item"><button type="button" data-history-symbol="${item.symbol}"><strong>${escapeHtml(item.name)}</strong><em>${item.symbol.slice(2)}</em></button><button class="watch-history-remove" type="button" aria-label="删除${escapeHtml(item.name)}" data-history-remove="${item.symbol}">×</button></span>`
+        )
+        .join("");
+    const clearButton = els.searchHistory.querySelector(".watch-history-clear");
+    if (clearButton) {
+      clearButton.addEventListener("click", (event) => {
+        event.preventDefault();
+        state.searchHistory = [];
+        saveSearchHistory(root.localStorage, state.searchHistory);
+        renderSearchHistory(state, els);
+      });
+    }
     els.searchHistory.querySelectorAll("[data-history-symbol]").forEach((button) => {
       button.addEventListener("click", () => {
         els.symbolInput.value = button.dataset.historySymbol;
@@ -1001,7 +1012,7 @@
     const price = quote ? quote.latestPrice : null;
     const change = quote && quote.pctChange !== null ? quote.pctChange : null;
     els.stockTitle.textContent = title;
-    els.stockMeta.textContent = quote ? `时间 ${quote.rawTime || "--"}  昨收 ${formatNumber(quote.prevClose)}  今开 ${formatNumber(quote.open)}` : "--";
+    els.stockMeta.textContent = quote ? `${quote.rawTime || "--"}  昨收 ${formatNumber(quote.prevClose)}  今开 ${formatNumber(quote.open)}` : "--";
     renderPriceBadge(els.priceBadge, price, change);
     renderOrderBook(els.orderBook, quote ? quote.orderBook : [], quote, state.klineByPeriod.m1 || []);
     updateNavigator(state, els);
@@ -1051,7 +1062,7 @@
     const body = rows.length
       ? rows.map((row) => `<div class="watch-trade-row"><span>${escapeHtml(row.time)}</span><strong>${formatNumber(row.price)}</strong><span>${formatVolume(row.volume)}</span></div>`).join("")
       : `<div class="watch-trade-empty">等待成交数据</div>`;
-    return `<div class="watch-trade-list"><div class="watch-trade-title">分时成交明细</div><div class="watch-trade-head"><span>时间</span><span>价格</span><span>成交量</span></div>${body}</div>`;
+    return `<div class="watch-trade-list"><div class="watch-trade-head"><span>时间</span><span>价格</span><span>成交量</span></div>${body}</div>`;
   }
 
   function renderIntraday(state, els) {
@@ -1260,8 +1271,10 @@
       .filter((tick) => tick.slot <= slotMax)
       .map((tick) => {
         const x = xForSlot(tick.slot);
+        const anchor = tick.slot === 240 ? "end" : "middle";
+        const textX = tick.slot === 240 ? x - 2 : x;
         return `<line x1="${x}" y1="${pad.top}" x2="${x}" y2="${h - pad.bottom}" stroke="#eef2f7" />
-          <text x="${x}" y="${h - 8}" fill="#64748b" font-size="11" text-anchor="middle">${tick.label}</text>`;
+          <text x="${textX}" y="${h - 8}" fill="#64748b" font-size="11" text-anchor="${anchor}">${tick.label}</text>`;
       })
       .join("");
     svg.setAttribute("viewBox", `0 0 ${w} ${h}`);

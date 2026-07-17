@@ -131,7 +131,7 @@ const orderHtml = watch.renderOrderBookHtml(
 );
 assert(orderHtml.includes("买1"));
 assert(orderHtml.includes("卖1"));
-assert(orderHtml.includes("分时成交明细"));
+assert(!orderHtml.includes("分时成交明细"));
 assert(!orderHtml.includes("五档盘口"));
 
 const syncRows = [

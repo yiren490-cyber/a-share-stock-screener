@@ -1273,6 +1273,16 @@ svg {
   font-weight: 600;
 }
 
+.watch-history-clear {
+  height: 30px;
+  border: 1px solid #fecaca;
+  border-radius: 5px;
+  background: #fff1f2;
+  color: #dc2626;
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .watch-history-item {
   display: grid;
   grid-template-columns: 1fr 28px;
@@ -1790,7 +1800,7 @@ svg {
   font-weight: 800;
   line-height: 30px;
   white-space: nowrap;
-  animation: watch-marquee 12s linear infinite;
+  animation: watch-marquee 24s linear infinite;
 }
 
 .watch-alert-banner.is-active {
@@ -1812,8 +1822,13 @@ svg {
 }
 
 .watch-zoom-bar button {
+  flex: 0 0 64px;
   height: 32px;
   padding: 0 12px;
+}
+
+#watchBannerButton {
+  flex-basis: 92px;
 }
 
 .watch-period-header {
