@@ -26,6 +26,7 @@
   const SEARCH_HISTORY_KEY = "stockWatchSearchHistory";
   const BANNER_ITEMS_KEY = "stockWatchBannerItems";
   const SELECTED_BANNER_KEY = "stockWatchSelectedBanner";
+  const QUOTE_NAME_CACHE_KEY = "stockWatchQuoteNames";
   const QUOTE_REFRESH_MS = 500;
   const KLINE_REFRESH_MS = 1500;
   const AUDIO_DB = "stockWatchAudio";
@@ -441,13 +442,14 @@
       quoteLoading: false,
       klineLoading: false,
       lastStatusAt: 0,
-      quoteNameCache: {},
+      quoteNameCache: readQuoteNameCache(root.localStorage),
     };
     const els = collectEls(doc);
     renderEmptyOrderBook(els.orderBook);
     renderPeriodPanels(state, els);
     updateZoomStatus(state, els);
     renderCategories(state, els);
+    hydrateCategoryNames(state, els);
     renderSearchHistory(state, els);
     renderBannerList(state, els);
     bindWatchEvents(state, els);
@@ -589,6 +591,23 @@
     root.localStorage.setItem(SELECTED_BANNER_KEY, state.selectedBannerId || "");
   }
 
+  function readQuoteNameCache(storage) {
+    try {
+      const parsed = JSON.parse((storage && storage.getItem(QUOTE_NAME_CACHE_KEY)) || "{}");
+      return Object.fromEntries(
+        Object.entries(parsed || {})
+          .map(([symbol, name]) => [normalizeSymbol(symbol), String(name || "").trim()])
+          .filter(([symbol, name]) => symbol && name)
+      );
+    } catch (_) {
+      return {};
+    }
+  }
+
+  function saveQuoteNameCache(storage, cache) {
+    storage.setItem(QUOTE_NAME_CACHE_KEY, JSON.stringify(cache || {}));
+  }
+
   function selectedBannerText(state) {
     const item = state.bannerItems.find((banner) => banner.id === state.selectedBannerId);
     return item ? item.text : "";
@@ -687,7 +706,7 @@
         const stocks = state.categories[name];
         const rows = stocks
           .map((symbol) => {
-            const label = state.quoteNameCache[symbol] ? `${state.quoteNameCache[symbol]} ${symbol.slice(2)}` : symbol;
+            const label = `${state.quoteNameCache[symbol] || "--"} ${symbol.slice(2)}`;
             return `<button class="watch-category-stock ${symbol === state.symbol ? "is-active" : ""}" type="button" data-category="${escapeHtml(name)}" data-symbol="${symbol}">${escapeHtml(label)}</button>`;
           })
           .join("");
@@ -704,6 +723,28 @@
     els.categoryList.querySelectorAll("[data-symbol]").forEach((button) => {
       button.addEventListener("click", () => loadSymbol(state, els, button.dataset.symbol, button.dataset.category));
     });
+  }
+
+  async function hydrateCategoryNames(state, els) {
+    const symbols = [...new Set(Object.values(state.categories).flat().map(normalizeSymbol).filter(Boolean))];
+    const missing = symbols.filter((symbol) => !state.quoteNameCache[symbol]);
+    if (!missing.length) return;
+    try {
+      const quotes = await fetchQuotes(missing);
+      let changed = false;
+      quotes.forEach((quote) => {
+        if (quote && quote.symbol && quote.name && state.quoteNameCache[quote.symbol] !== quote.name) {
+          state.quoteNameCache[quote.symbol] = quote.name;
+          changed = true;
+        }
+      });
+      if (changed) {
+        saveQuoteNameCache(root.localStorage, state.quoteNameCache);
+        renderCategories(state, els);
+      }
+    } catch (_) {
+      // Names will be filled when individual quotes load.
+    }
   }
 
   async function loadSymbol(state, els, symbol, categoryName) {
@@ -767,6 +808,7 @@
       const previousName = state.quoteNameCache[state.symbol];
       if (state.quote && state.quote.name) {
         state.quoteNameCache[state.symbol] = state.quote.name;
+        saveQuoteNameCache(root.localStorage, state.quoteNameCache);
       }
       renderQuote(state, els);
       if (state.quote && state.quote.name && state.quote.name !== previousName) renderCategories(state, els);
@@ -812,6 +854,19 @@
     const quote = text.split(/\n+/).map((line) => parseQuoteLine(line.trim())).find(Boolean);
     if (!quote) throw new Error("无可用行情数据");
     return quote;
+  }
+
+  async function fetchQuotes(symbols) {
+    const normalized = [...new Set((symbols || []).map(normalizeSymbol).filter(Boolean))];
+    if (!normalized.length) return [];
+    const response = await fetch(`${QUOTE_URL}${normalized.join(",")}`);
+    if (!response.ok) throw new Error(`腾讯行情接口返回 ${response.status}`);
+    const buffer = await response.arrayBuffer();
+    const text = new TextDecoder("gbk").decode(buffer);
+    return text
+      .split(/\n+/)
+      .map((line) => parseQuoteLine(line.trim()))
+      .filter(Boolean);
   }
 
   async function fetchKline(symbol, period) {
@@ -1217,7 +1272,6 @@
       ${crosshair}
       <text x="${pad.left - 4}" y="${pad.top + 10}" fill="#64748b" font-size="11" text-anchor="end">${priceScale.max.toFixed(2)}</text>
       <text x="${pad.left - 4}" y="${priceBottom - 2}" fill="#64748b" font-size="11" text-anchor="end">${priceScale.min.toFixed(2)}</text>
-      <text x="${pad.left - 4}" y="${h - pad.bottom - 4}" fill="#64748b" font-size="11" text-anchor="end">量</text>
       <rect data-hit-area="intraday" x="${pad.left}" y="${pad.top}" width="${w - pad.left - pad.right}" height="${h - pad.top - pad.bottom}" fill="transparent" />`;
     const displayTime = hoverSlot !== null ? `${hoverRow.date.slice(0, 10)} ${slotToTradingTime(hoverSlot)}` : hoverRow && hoverRow.date;
     if (info && hoverRow) {
@@ -1243,7 +1297,7 @@
   }
 
   function panelMainHeight(visibleBars) {
-    return 260;
+    return panelSubHeight(visibleBars);
   }
 
   function panelSubHeight(visibleBars) {
@@ -1435,11 +1489,9 @@
     if (els.enableSoundButton) els.enableSoundButton.textContent = state.soundEnabled ? "关闭音频" : "启用声音";
     if (!state.soundEnabled) {
       stopAlertLoop(state);
-      if (els.audioStatus) els.audioStatus.textContent = state.uploadedAudioUrl ? "自定义音频已保存" : "默认提示音";
       updateAlertBanner(state, els);
       return;
     }
-    if (els.audioStatus) els.audioStatus.textContent = state.uploadedAudioUrl ? "声音已启用：自定义音频" : "声音已启用：默认提示音";
     if (state.previousAlertCount >= 2) startAlertLoop(state);
     updateAlertBanner(state, els);
   }
@@ -1499,16 +1551,12 @@
     setUploadedAudioUrl(state, root.URL && root.URL.createObjectURL ? root.URL.createObjectURL(file) : "");
     try {
       await saveAudioToDb(file);
-      els.audioStatus.textContent = state.soundEnabled ? "声音已启用：自定义音频" : "已保存自定义音频";
     } catch (_) {
       try {
         const dataUrl = await readFileAsDataUrl(file);
         setUploadedAudioUrl(state, dataUrl);
         root.sessionStorage.setItem("stockWatchSessionAudio", dataUrl);
-        els.audioStatus.textContent = state.soundEnabled ? "声音已启用：自定义音频，本会话有效" : "已加载自定义音频，本会话有效";
-      } catch (error) {
-        els.audioStatus.textContent = "音频保存失败，请重新上传";
-      }
+      } catch (error) {}
     }
     if (wasLooping || (state.soundEnabled && state.previousAlertCount >= 2)) startAlertLoop(state);
   }
@@ -1542,9 +1590,10 @@
 
   async function saveAudioToDb(file) {
     const db = await openAudioDb();
+    const buffer = await file.arrayBuffer();
     return new Promise((resolve, reject) => {
       const tx = db.transaction("files", "readwrite");
-      tx.objectStore("files").put({ blob: file, name: file.name, type: file.type, savedAt: Date.now() }, "alert");
+      tx.objectStore("files").put({ buffer, name: file.name, type: file.type || "audio/mpeg", savedAt: Date.now() }, "alert");
       tx.oncomplete = resolve;
       tx.onerror = () => reject(tx.error);
     });
@@ -1556,12 +1605,15 @@
       if (result) {
         if (typeof result === "string") {
           setUploadedAudioUrl(state, result);
-          els.audioStatus.textContent = "已加载自定义音频";
+          return;
+        }
+        if (result.buffer && root.Blob && root.URL && root.URL.createObjectURL) {
+          const blob = new root.Blob([result.buffer], { type: result.type || "audio/mpeg" });
+          setUploadedAudioUrl(state, root.URL.createObjectURL(blob));
           return;
         }
         if (result.blob && root.URL && root.URL.createObjectURL) {
           setUploadedAudioUrl(state, root.URL.createObjectURL(result.blob));
-          els.audioStatus.textContent = "已加载自定义音频";
           return;
         }
       }
@@ -1572,7 +1624,6 @@
       const sessionAudio = root.sessionStorage && root.sessionStorage.getItem("stockWatchSessionAudio");
       if (sessionAudio) {
         setUploadedAudioUrl(state, sessionAudio);
-        els.audioStatus.textContent = "已加载自定义音频，本会话有效";
       }
     }
   }
@@ -1613,6 +1664,7 @@
     adjustVisibleBars,
     nearestIndexForDate,
     parseQuoteLine,
+    fetchQuotes,
     recentTradeRows,
     renderOrderBookHtml,
     renderIntradayInfoHtml,
@@ -1621,6 +1673,7 @@
     addSearchHistory,
     removeSearchHistory,
     normalizeBannerItems,
+    readQuoteNameCache,
     scaleDomain,
     intradayLayout,
     intradaySlotMax,

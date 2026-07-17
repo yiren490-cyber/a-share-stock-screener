@@ -171,6 +171,10 @@ assert.deepStrictEqual(watch.removeSearchHistory([{ symbol: "sz300750", name: "�
 assert.deepStrictEqual(watch.normalizeBannerItems([{ id: "a", text: "  预警一  " }, { id: "a", text: "重复" }, { id: "b", text: "" }]), [
   { id: "a", text: "预警一" },
 ]);
+assert.deepStrictEqual(
+  watch.readQuoteNameCache({ getItem: () => JSON.stringify({ sh600519: "贵州茅台", bad: "坏数据", sz000001: "" }) }),
+  { sh600519: "贵州茅台" }
+);
 
 const paddedDomain = watch.scaleDomain([10, 12], 0.1);
 assert.strictEqual(paddedDomain.min, 9.8);
@@ -204,6 +208,7 @@ const fakeInfo = { textContent: "", innerHTML: "", classList: { remove() {}, add
 watch.drawIntradayChart(fakeSvg, [{ date: "2026-07-17 09:30", open: 10, high: 12, low: 8, close: 11, volume: 100 }], fakeInfo, { prevClose: 9 }, "", null);
 assert(fakeSvg.innerHTML.includes(`y="${intradayLayout.priceBottom - 2}" fill="#64748b" font-size="11" text-anchor="end">`), "intraday min label should sit at the bottom of the price scale");
 assert(!fakeSvg.innerHTML.includes(`y="${intradayLayout.volumeTop}" fill="#64748b" font-size="11" text-anchor="end">`), "intraday min label should not sit at the overlapped volume top");
+assert(!fakeSvg.innerHTML.includes(">量<"), "intraday chart should not show the volume label text");
 
 const intradayInfo = watch.renderIntradayInfoHtml({
   time: "2026-07-17 09:30",
