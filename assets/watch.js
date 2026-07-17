@@ -5,6 +5,11 @@
 })(typeof window !== "undefined" ? window : globalThis, function (root) {
   const QUOTE_URL = "https://qt.gtimg.cn/q=";
   const EASTMONEY_KLINE_URL = "https://push2his.eastmoney.com/api/qt/stock/kline/get";
+  const TENCENT_DAY_KLINE_URLS = [
+    "https://web.ifzq.gtimg.cn/appstock/app/fqkline/get",
+    "https://ifzq.gtimg.cn/appstock/app/fqkline/get",
+  ];
+  const TENCENT_MINUTE_KLINE_URL = "https://ifzq.gtimg.cn/appstock/app/kline/mkline";
   const PERIODS = ["m1", "m5", "m30", "day"];
   const PERIOD_META = {
     m1: { label: "1分钟", klt: "1", bars: 120 },
@@ -285,6 +290,19 @@
           volume: Number(parts[5]),
         };
       })
+      .filter((row) => row.date && Number.isFinite(row.open) && Number.isFinite(row.close) && Number.isFinite(row.high) && Number.isFinite(row.low));
+  }
+
+  function normalizeTencentKlineRows(rows) {
+    return (rows || [])
+      .map((row) => ({
+        date: normalizeKlineDate(row[0]),
+        open: Number(row[1]),
+        close: Number(row[2]),
+        high: Number(row[3]),
+        low: Number(row[4]),
+        volume: Number(row[5]),
+      }))
       .filter((row) => row.date && Number.isFinite(row.open) && Number.isFinite(row.close) && Number.isFinite(row.high) && Number.isFinite(row.low));
   }
 
@@ -637,8 +655,13 @@
     if (state.klineLoading) return;
     state.klineLoading = true;
     try {
-      const entries = await Promise.all(PERIODS.map(async (period) => [period, await fetchKline(state.symbol, period)]));
-      state.klineByPeriod = Object.fromEntries(entries);
+      const results = await Promise.allSettled(PERIODS.map(async (period) => [period, await fetchKline(state.symbol, period)]));
+      results.forEach((result) => {
+        if (result.status === "fulfilled") {
+          const [period, rows] = result.value;
+          state.klineByPeriod[period] = rows;
+        }
+      });
       renderQuote(state, els);
       renderIntraday(state, els);
       updatePeriodPanelCharts(state, els);
@@ -661,6 +684,12 @@
   }
 
   async function fetchKline(symbol, period) {
+    try {
+      const rows = await fetchTencentKline(symbol, period);
+      if (rows.length) return rows;
+    } catch (_) {
+      // Fall back to local proxy or Eastmoney below.
+    }
     const query = new URLSearchParams({ symbol, period: eastmoneyKlt(period) }).toString();
     try {
       const response = await fetch(`/api/eastmoney-kline?${query}`);
@@ -690,9 +719,49 @@
     return rows;
   }
 
+  async function fetchTencentKline(symbol, period) {
+    if (period === "m1" || period === "m5" || period === "m30") return fetchTencentMinuteKline(symbol, period);
+    return fetchTencentDayKline(symbol);
+  }
+
+  async function fetchTencentMinuteKline(symbol, period) {
+    const key = period;
+    const varName = `sw_tq_${symbol}_${key}_${Date.now()}_${Math.round(Math.random() * 100000)}`;
+    const url = `${TENCENT_MINUTE_KLINE_URL}?${new URLSearchParams({
+      _var: varName,
+      param: `${symbol},${key},,520`,
+      r: String(Math.random()),
+    }).toString()}`;
+    const payload = await jsonp(url, varName);
+    const data = payload.data && payload.data[symbol];
+    return normalizeTencentKlineRows((data && data[key]) || []);
+  }
+
+  async function fetchTencentDayKline(symbol) {
+    let lastError = null;
+    for (const endpoint of TENCENT_DAY_KLINE_URLS) {
+      try {
+        const varName = `sw_tq_${symbol}_day_${Date.now()}_${Math.round(Math.random() * 100000)}`;
+        const url = `${endpoint}?${new URLSearchParams({
+          _var: varName,
+          param: `${symbol},day,,,520,qfq`,
+        }).toString()}`;
+        const payload = await jsonp(url, varName);
+        const data = payload.data && payload.data[symbol];
+        const rows = normalizeTencentKlineRows((data && (data.qfqday || data.day)) || []);
+        if (rows.length) return rows;
+      } catch (error) {
+        lastError = error;
+      }
+    }
+    if (lastError) throw lastError;
+    return [];
+  }
+
   function jsonp(url, varName) {
     return new Promise((resolve, reject) => {
       const script = root.document.createElement("script");
+      let callbackPayload = null;
       const timeout = root.setTimeout(() => {
         cleanup();
         reject(new Error("数据源请求超时"));
@@ -703,8 +772,12 @@
         script.remove();
       }
       root[varName] = (payload) => {
+        callbackPayload = payload;
+      };
+      script.onload = () => {
+        const result = callbackPayload || (typeof root[varName] === "function" ? null : root[varName]);
         cleanup();
-        resolve(payload);
+        result ? resolve(result) : reject(new Error("数据源返回为空"));
       };
       script.onerror = () => {
         cleanup();
