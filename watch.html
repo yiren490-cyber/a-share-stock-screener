@@ -38,8 +38,7 @@
           <span>上传预警音频</span>
           <input id="alertAudioInput" type="file" accept="audio/*" />
         </label>
-        <span id="audioStatus">默认提示音</span>
-        <button id="watchBannerButton" type="button">横幅内容</button>
+        <span id="audioStatus" hidden></span>
         <button id="watchRefreshButton" class="watch-realtime-button" type="button">实时刷新</button>
       </section>
 
@@ -49,7 +48,7 @@
             <h2 id="watchBannerTitle">预警横幅内容</h2>
             <button id="watchBannerCloseButton" type="button" aria-label="关闭">×</button>
           </div>
-          <textarea id="watchBannerInput" rows="3" placeholder="输入亮起2个红灯时要循环播放的内容"></textarea>
+          <textarea id="watchBannerInput" rows="3"></textarea>
           <button id="watchBannerAddButton" type="button">添加内容</button>
           <div id="watchBannerList" class="watch-banner-list"></div>
         </div>
@@ -83,8 +82,8 @@
       </section>
 
       <section class="watch-zoom-bar" aria-label="K线缩放">
-        <span id="watchZoomStatus">K线数量：120</span>
-        <div id="watchAlertBanner" class="watch-alert-banner" hidden><span></span></div>
+        <button id="watchBannerButton" type="button">横幅内容</button>
+        <div id="watchAlertBanner" class="watch-alert-banner"><span></span></div>
         <button id="watchZoomInButton" type="button">放大</button>
         <button id="watchZoomOutButton" type="button">缩小</button>
         <button id="watchZoomResetButton" type="button">重置</button>

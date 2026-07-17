@@ -192,6 +192,18 @@ assert.deepStrictEqual(
   [10, 12, 8, 11, 9, 10.5],
   "intraday scale should use OHLC, previous close, and average"
 );
+const fakeSvg = {
+  attrs: {},
+  innerHTML: "",
+  setAttribute(name, value) {
+    this.attrs[name] = value;
+  },
+  addEventListener() {},
+};
+const fakeInfo = { textContent: "", innerHTML: "", classList: { remove() {}, add() {} } };
+watch.drawIntradayChart(fakeSvg, [{ date: "2026-07-17 09:30", open: 10, high: 12, low: 8, close: 11, volume: 100 }], fakeInfo, { prevClose: 9 }, "", null);
+assert(fakeSvg.innerHTML.includes(`y="${intradayLayout.priceBottom - 2}" fill="#64748b" font-size="11" text-anchor="end">`), "intraday min label should sit at the bottom of the price scale");
+assert(!fakeSvg.innerHTML.includes(`y="${intradayLayout.volumeTop}" fill="#64748b" font-size="11" text-anchor="end">`), "intraday min label should not sit at the overlapped volume top");
 
 const intradayInfo = watch.renderIntradayInfoHtml({
   time: "2026-07-17 09:30",

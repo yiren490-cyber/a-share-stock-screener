@@ -654,7 +654,7 @@
     if (!els.alertBanner) return;
     const text = selectedBannerText(state);
     const shouldShow = Boolean(state.soundEnabled && state.previousAlertCount >= 2 && text);
-    els.alertBanner.hidden = !shouldShow;
+    els.alertBanner.classList.toggle("is-active", shouldShow);
     const content = els.alertBanner.querySelector("span");
     if (content) content.textContent = shouldShow ? text : "";
   }
@@ -1216,7 +1216,7 @@
       ${volumeBars}
       ${crosshair}
       <text x="${pad.left - 4}" y="${pad.top + 10}" fill="#64748b" font-size="11" text-anchor="end">${priceScale.max.toFixed(2)}</text>
-      <text x="${pad.left - 4}" y="${volumeTop}" fill="#64748b" font-size="11" text-anchor="end">${priceScale.min.toFixed(2)}</text>
+      <text x="${pad.left - 4}" y="${priceBottom - 2}" fill="#64748b" font-size="11" text-anchor="end">${priceScale.min.toFixed(2)}</text>
       <text x="${pad.left - 4}" y="${h - pad.bottom - 4}" fill="#64748b" font-size="11" text-anchor="end">量</text>
       <rect data-hit-area="intraday" x="${pad.left}" y="${pad.top}" width="${w - pad.left - pad.right}" height="${h - pad.top - pad.bottom}" fill="transparent" />`;
     const displayTime = hoverSlot !== null ? `${hoverRow.date.slice(0, 10)} ${slotToTradingTime(hoverSlot)}` : hoverRow && hoverRow.date;
@@ -1551,30 +1551,41 @@
   }
 
   async function loadStoredAudio(state, els) {
-    const sessionAudio = root.sessionStorage && root.sessionStorage.getItem("stockWatchSessionAudio");
-    if (sessionAudio) {
-      setUploadedAudioUrl(state, sessionAudio);
-      els.audioStatus.textContent = "已加载自定义音频，本会话有效";
-      return;
-    }
     try {
-      const db = await openAudioDb();
-      const tx = db.transaction("files", "readonly");
-      const request = tx.objectStore("files").get("alert");
-      request.onsuccess = () => {
-        if (request.result) {
-          if (typeof request.result === "string") {
-            setUploadedAudioUrl(state, request.result);
-            els.audioStatus.textContent = "已加载自定义音频";
-          } else if (request.result.blob && root.URL && root.URL.createObjectURL) {
-            setUploadedAudioUrl(state, root.URL.createObjectURL(request.result.blob));
-            els.audioStatus.textContent = "已加载自定义音频";
-          }
+      const result = await readAudioFromDb();
+      if (result) {
+        if (typeof result === "string") {
+          setUploadedAudioUrl(state, result);
+          els.audioStatus.textContent = "已加载自定义音频";
+          return;
         }
-      };
+        if (result.blob && root.URL && root.URL.createObjectURL) {
+          setUploadedAudioUrl(state, root.URL.createObjectURL(result.blob));
+          els.audioStatus.textContent = "已加载自定义音频";
+          return;
+        }
+      }
     } catch (_) {
       // Default tone remains available.
     }
+    if (!state.uploadedAudioUrl) {
+      const sessionAudio = root.sessionStorage && root.sessionStorage.getItem("stockWatchSessionAudio");
+      if (sessionAudio) {
+        setUploadedAudioUrl(state, sessionAudio);
+        els.audioStatus.textContent = "已加载自定义音频，本会话有效";
+      }
+    }
+  }
+
+  async function readAudioFromDb() {
+    const db = await openAudioDb();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction("files", "readonly");
+      const request = tx.objectStore("files").get("alert");
+      request.onsuccess = () => resolve(request.result || null);
+      request.onerror = () => reject(request.error);
+      tx.onerror = () => reject(tx.error);
+    });
   }
 
   function clearTimers(state) {
@@ -1614,6 +1625,7 @@
     intradayLayout,
     intradaySlotMax,
     intradayPriceValues,
+    drawIntradayChart,
     initWatchPage,
   };
 });
