@@ -27,6 +27,7 @@
   const BANNER_ITEMS_KEY = "stockWatchBannerItems";
   const SELECTED_BANNER_KEY = "stockWatchSelectedBanner";
   const QUOTE_NAME_CACHE_KEY = "stockWatchQuoteNames";
+  const SELECTED_AUDIO_KEY = "stockWatchSelectedAudioId";
   const QUOTE_REFRESH_MS = 500;
   const KLINE_REFRESH_MS = 1500;
   const AUDIO_DB = "stockWatchAudio";
@@ -434,6 +435,8 @@
       soundEnabled: false,
       uploadedAudioUrl: "",
       uploadedAudioObjectUrl: "",
+      audioItems: [],
+      selectedAudioId: root.localStorage.getItem(SELECTED_AUDIO_KEY) || "",
       audioReadyPromise: null,
       alertAudio: null,
       alertToneTimer: null,
@@ -453,6 +456,7 @@
     hydrateCategoryNames(state, els);
     renderSearchHistory(state, els);
     renderBannerList(state, els);
+    renderAudioPicker(state, els);
     bindWatchEvents(state, els);
     state.audioReadyPromise = loadStoredAudio(state, els);
     const lastSymbol = normalizeSymbol(root.localStorage.getItem(LAST_SYMBOL_KEY) || "");
@@ -479,6 +483,7 @@
       alertLights: doc.getElementById("alertLights"),
       enableSoundButton: doc.getElementById("enableSoundButton"),
       alertAudioInput: doc.getElementById("alertAudioInput"),
+      alertAudioSelect: doc.getElementById("alertAudioSelect"),
       audioStatus: doc.getElementById("audioStatus"),
       bannerButton: doc.getElementById("watchBannerButton"),
       bannerModal: doc.getElementById("watchBannerModal"),
@@ -512,6 +517,10 @@
       await setSoundEnabled(state, els, !state.soundEnabled);
     });
     els.alertAudioInput.addEventListener("change", () => handleAudioUpload(state, els));
+    els.alertAudioSelect.addEventListener("change", async () => {
+      if (state.audioReadyPromise) await state.audioReadyPromise;
+      selectAlertAudio(state, els, els.alertAudioSelect.value);
+    });
     els.bannerButton.addEventListener("click", () => openBannerModal(els));
     els.bannerCloseButton.addEventListener("click", () => closeBannerModal(els));
     els.bannerModal.addEventListener("click", (event) => {
@@ -689,7 +698,13 @@
   }
 
   function renderCategories(state, els) {
+    const listScrollTop = els.categoryList ? els.categoryList.scrollTop : 0;
+    const stockScrollTops = {};
     if (els.categoryList) {
+      els.categoryList.querySelectorAll(".watch-category-stocks").forEach((node) => {
+        const name = node.closest(".watch-category-group") && node.closest(".watch-category-group").dataset.categoryName;
+        if (name) stockScrollTops[name] = node.scrollTop;
+      });
       els.categoryList.querySelectorAll(".watch-category-group").forEach((group) => {
         const name = group.dataset.categoryName || "";
         if (!name) return;
@@ -723,6 +738,11 @@
     });
     els.categoryList.querySelectorAll("[data-symbol]").forEach((button) => {
       button.addEventListener("click", () => loadSymbol(state, els, button.dataset.symbol, button.dataset.category));
+    });
+    els.categoryList.scrollTop = listScrollTop;
+    els.categoryList.querySelectorAll(".watch-category-stocks").forEach((node) => {
+      const name = node.closest(".watch-category-group") && node.closest(".watch-category-group").dataset.categoryName;
+      if (name && stockScrollTops[name] !== undefined) node.scrollTop = stockScrollTops[name];
     });
   }
 
@@ -1552,21 +1572,26 @@
   }
 
   async function handleAudioUpload(state, els) {
-    const file = els.alertAudioInput.files && els.alertAudioInput.files[0];
-    if (!file) return;
+    const files = Array.from((els.alertAudioInput && els.alertAudioInput.files) || []);
+    if (!files.length) return;
     if (state.audioReadyPromise) await state.audioReadyPromise;
     const wasLooping = state.alertLoopActive;
     stopAlertLoop(state);
-    setUploadedAudioUrl(state, root.URL && root.URL.createObjectURL ? root.URL.createObjectURL(file) : "");
+    const savedItems = [];
     try {
-      await saveAudioToDb(file);
+      for (const file of files) savedItems.push(await saveAudioToDb(file));
       state.audioReadyPromise = Promise.resolve();
     } catch (_) {
       try {
+        const file = files[0];
         const dataUrl = await readFileAsDataUrl(file);
-        setUploadedAudioUrl(state, dataUrl);
+        savedItems.push({ id: makeAudioId(file.name), name: file.name || "本会话音频", type: file.type || "audio/mpeg", dataUrl });
         root.sessionStorage.setItem("stockWatchSessionAudio", dataUrl);
       } catch (error) {}
+    }
+    if (savedItems.length) {
+      state.audioItems = mergeAudioItems([...state.audioItems, ...savedItems]);
+      selectAlertAudio(state, els, savedItems[savedItems.length - 1].id);
     }
     if (wasLooping || (state.soundEnabled && state.previousAlertCount >= 2)) startAlertLoop(state);
     updateStoredAudioMarker(state, els);
@@ -1599,37 +1624,37 @@
     });
   }
 
+  function makeAudioId(name) {
+    return `audio-${Date.now().toString(36)}-${Math.abs(hashText(name || "audio")).toString(36)}-${Math.round(Math.random() * 100000).toString(36)}`;
+  }
+
+  function mergeAudioItems(items) {
+    const byId = new Map();
+    (items || []).forEach((item) => {
+      if (item && item.id) byId.set(item.id, item);
+    });
+    return [...byId.values()].sort((a, b) => Number(a.savedAt || 0) - Number(b.savedAt || 0));
+  }
+
   async function saveAudioToDb(file) {
     const db = await openAudioDb();
     const buffer = await file.arrayBuffer();
+    const item = { id: makeAudioId(file.name), name: file.name || "预警音频", type: file.type || "audio/mpeg", buffer, savedAt: Date.now() };
     return new Promise((resolve, reject) => {
       const tx = db.transaction("files", "readwrite");
-      tx.objectStore("files").put({ buffer, name: file.name, type: file.type || "audio/mpeg", savedAt: Date.now() }, "alert");
-      tx.oncomplete = resolve;
+      tx.objectStore("files").put(item, `audio:${item.id}`);
+      tx.oncomplete = () => resolve(item);
       tx.onerror = () => reject(tx.error);
     });
   }
 
   async function loadStoredAudio(state, els) {
     try {
-      const result = await readAudioFromDb();
-      if (result) {
-        if (typeof result === "string") {
-          setUploadedAudioUrl(state, result);
-          updateStoredAudioMarker(state, els);
-          return;
-        }
-        if (result.buffer && root.Blob && root.URL && root.URL.createObjectURL) {
-          const blob = new root.Blob([result.buffer], { type: result.type || "audio/mpeg" });
-          setUploadedAudioUrl(state, root.URL.createObjectURL(blob));
-          updateStoredAudioMarker(state, els);
-          return;
-        }
-        if (result.blob && root.URL && root.URL.createObjectURL) {
-          setUploadedAudioUrl(state, root.URL.createObjectURL(result.blob));
-          updateStoredAudioMarker(state, els);
-          return;
-        }
+      state.audioItems = mergeAudioItems(await readAudioLibraryFromDb());
+      const selectedId = state.audioItems.some((item) => item.id === state.selectedAudioId) ? state.selectedAudioId : (state.audioItems[0] && state.audioItems[0].id) || "";
+      if (selectedId) {
+        selectAlertAudio(state, els, selectedId);
+        return;
       }
     } catch (_) {
       // Default tone remains available.
@@ -1637,11 +1662,46 @@
     if (!state.uploadedAudioUrl) {
       const sessionAudio = root.sessionStorage && root.sessionStorage.getItem("stockWatchSessionAudio");
       if (sessionAudio) {
-        setUploadedAudioUrl(state, sessionAudio);
-        updateStoredAudioMarker(state, els);
+        const item = { id: "session-audio", name: "本会话音频", dataUrl: sessionAudio, savedAt: Date.now() };
+        state.audioItems = mergeAudioItems([...state.audioItems, item]);
+        selectAlertAudio(state, els, item.id);
       }
     }
+    renderAudioPicker(state, els);
     updateStoredAudioMarker(state, els);
+  }
+
+  function audioItemUrl(item) {
+    if (!item) return "";
+    if (item.dataUrl) return item.dataUrl;
+    if (item.buffer && root.Blob && root.URL && root.URL.createObjectURL) {
+      return root.URL.createObjectURL(new root.Blob([item.buffer], { type: item.type || "audio/mpeg" }));
+    }
+    if (item.blob && root.URL && root.URL.createObjectURL) return root.URL.createObjectURL(item.blob);
+    return "";
+  }
+
+  function selectAlertAudio(state, els, id) {
+    const item = state.audioItems.find((audio) => audio.id === id);
+    state.selectedAudioId = item ? item.id : "";
+    root.localStorage.setItem(SELECTED_AUDIO_KEY, state.selectedAudioId);
+    setUploadedAudioUrl(state, item ? audioItemUrl(item) : "");
+    renderAudioPicker(state, els);
+    updateStoredAudioMarker(state, els);
+  }
+
+  function renderAudioPicker(state, els) {
+    const items = state.audioItems || [];
+    if (els.alertAudioSelect) {
+      els.alertAudioSelect.innerHTML = items.length
+        ? items.map((item) => `<option value="${item.id}" ${item.id === state.selectedAudioId ? "selected" : ""}>${escapeHtml(item.name || "预警音频")}</option>`).join("")
+        : '<option value="">默认提示音</option>';
+      els.alertAudioSelect.disabled = !items.length;
+    }
+    if (els.audioStatus) {
+      const item = items.find((audio) => audio.id === state.selectedAudioId);
+      els.audioStatus.textContent = item ? `当前音频：${item.name || "预警音频"}` : "当前音频：默认提示音";
+    }
   }
 
   function updateStoredAudioMarker(state, els) {
@@ -1652,12 +1712,26 @@
     return Boolean(state && state.uploadedAudioUrl);
   }
 
-  async function readAudioFromDb() {
+  async function readAudioLibraryFromDb() {
     const db = await openAudioDb();
     return new Promise((resolve, reject) => {
+      const items = [];
       const tx = db.transaction("files", "readonly");
-      const request = tx.objectStore("files").get("alert");
-      request.onsuccess = () => resolve(request.result || null);
+      const request = tx.objectStore("files").openCursor();
+      request.onsuccess = () => {
+        const cursor = request.result;
+        if (!cursor) return;
+        const value = cursor.value;
+        const key = String(cursor.key || "");
+        if (key.startsWith("audio:") && value && value.id) {
+          items.push(value);
+        } else if (key === "alert" && value) {
+          if (typeof value === "string") items.push({ id: "legacy-alert", name: "已保存音频", dataUrl: value, savedAt: 0 });
+          else items.push({ id: "legacy-alert", name: value.name || "已保存音频", type: value.type || "audio/mpeg", buffer: value.buffer, blob: value.blob, savedAt: value.savedAt || 0 });
+        }
+        cursor.continue();
+      };
+      tx.oncomplete = () => resolve(items);
       request.onerror = () => reject(request.error);
       tx.onerror = () => reject(tx.error);
     });
@@ -1704,6 +1778,7 @@
     intradaySlotMax,
     intradayPriceValues,
     drawIntradayChart,
+    mergeAudioItems,
     hasStoredAlertAudio,
     initWatchPage,
   };

@@ -84,6 +84,7 @@ alerts = watch.evaluateAlerts({
   fiveMinute: { price: 10.5, upper: 10.4 },
   day: { price: 11, upper: 10 },
 });
+assert.strictEqual(alerts.minuteKdj, true, "minute KDJ alert should use any K/D/J line above 80");
 assert.strictEqual(alerts.count, 3);
 assert.strictEqual(alerts.shouldPlay, false, "sound should not repeat while already in alert state");
 
@@ -225,5 +226,9 @@ assert.strictEqual(watch.renderKlineInfo({ date: "2026-07-17 13:30", open: 31.8,
 assert.strictEqual(watch.renderKlineInfo(null), "等待数据");
 assert.strictEqual(watch.hasStoredAlertAudio({ uploadedAudioUrl: "blob:http://local/audio" }), true);
 assert.strictEqual(watch.hasStoredAlertAudio({ uploadedAudioUrl: "" }), false);
+assert.deepStrictEqual(watch.mergeAudioItems([{ id: "a", name: "旧", savedAt: 1 }, { id: "a", name: "新", savedAt: 2 }, { id: "b", name: "另一个", savedAt: 1 }]), [
+  { id: "b", name: "另一个", savedAt: 1 },
+  { id: "a", name: "新", savedAt: 2 },
+]);
 
 console.log("watch helper tests passed");

@@ -1404,6 +1404,21 @@ svg {
   border: 0;
 }
 
+.watch-audio-bar select {
+  width: min(240px, 26vw);
+  height: 34px;
+}
+
+#audioStatus {
+  max-width: 360px;
+  overflow: hidden;
+  color: #475569;
+  font-size: 13px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .watch-banner-modal[hidden] {
   display: none;
 }

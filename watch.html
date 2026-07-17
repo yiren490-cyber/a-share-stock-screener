@@ -35,9 +35,10 @@
       <section class="watch-audio-bar">
         <button id="enableSoundButton" type="button">启用预警音频</button>
         <label>
-          <input id="alertAudioInput" type="file" accept="audio/*" />
+          <input id="alertAudioInput" type="file" accept="audio/*" multiple />
         </label>
-        <span id="audioStatus" hidden></span>
+        <select id="alertAudioSelect" aria-label="选择预警音频"></select>
+        <span id="audioStatus">当前音频：默认提示音</span>
         <button id="watchRefreshButton" class="watch-realtime-button" type="button">实时刷新</button>
       </section>
 
