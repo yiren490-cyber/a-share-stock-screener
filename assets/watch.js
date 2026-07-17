@@ -1063,7 +1063,8 @@
       <rect x="${pad.left}" y="${volumeTop}" width="${w - pad.left - pad.right}" height="${volumeHeight}" fill="#f8fafc" opacity="0.46" />
       <line x1="${pad.left}" y1="${volumeTop}" x2="${w - pad.right}" y2="${volumeTop}" stroke="#dfe5ec" stroke-dasharray="4 4" />
       <line x1="${pad.left}" y1="${h - pad.bottom}" x2="${w - pad.right}" y2="${h - pad.bottom}" stroke="#dfe5ec" />
-      ${prevY ? `<line x1="${pad.left}" y1="${prevY}" x2="${w - pad.right}" y2="${prevY}" stroke="#94a3b8" stroke-dasharray="4 4" />` : ""}
+      ${prevY ? `<line x1="${pad.left}" y1="${prevY}" x2="${w - pad.right}" y2="${prevY}" stroke="#dc2626" stroke-dasharray="4 4" />
+      <text x="8" y="${prevY + 4}" fill="#dc2626" font-size="11">0.00%</text>` : ""}
       <path d="${priceLine}" fill="none" stroke="#1d4ed8" stroke-width="1.8" />
       <path d="${averageLine}" fill="none" stroke="#f59e0b" stroke-width="1.3" />
       ${volumeBars}
