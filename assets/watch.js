@@ -24,6 +24,8 @@
   const LAST_CATEGORY_KEY = "stockWatchLastCategory";
   const VISIBLE_BARS_KEY = "stockWatchVisibleBars";
   const SEARCH_HISTORY_KEY = "stockWatchSearchHistory";
+  const BANNER_ITEMS_KEY = "stockWatchBannerItems";
+  const SELECTED_BANNER_KEY = "stockWatchSelectedBanner";
   const QUOTE_REFRESH_MS = 500;
   const KLINE_REFRESH_MS = 1500;
   const AUDIO_DB = "stockWatchAudio";
@@ -430,9 +432,12 @@
       previousAlertCount: 0,
       soundEnabled: false,
       uploadedAudioUrl: "",
+      uploadedAudioObjectUrl: "",
       alertAudio: null,
       alertToneTimer: null,
       alertLoopActive: false,
+      bannerItems: readBannerItems(root.localStorage),
+      selectedBannerId: root.localStorage.getItem(SELECTED_BANNER_KEY) || "",
       quoteLoading: false,
       klineLoading: false,
       lastStatusAt: 0,
@@ -444,6 +449,7 @@
     updateZoomStatus(state, els);
     renderCategories(state, els);
     renderSearchHistory(state, els);
+    renderBannerList(state, els);
     bindWatchEvents(state, els);
     loadStoredAudio(state, els);
     const lastSymbol = normalizeSymbol(root.localStorage.getItem(LAST_SYMBOL_KEY) || "");
@@ -471,6 +477,13 @@
       enableSoundButton: doc.getElementById("enableSoundButton"),
       alertAudioInput: doc.getElementById("alertAudioInput"),
       audioStatus: doc.getElementById("audioStatus"),
+      bannerButton: doc.getElementById("watchBannerButton"),
+      bannerModal: doc.getElementById("watchBannerModal"),
+      bannerCloseButton: doc.getElementById("watchBannerCloseButton"),
+      bannerInput: doc.getElementById("watchBannerInput"),
+      bannerAddButton: doc.getElementById("watchBannerAddButton"),
+      bannerList: doc.getElementById("watchBannerList"),
+      alertBanner: doc.getElementById("watchAlertBanner"),
       zoomInButton: doc.getElementById("watchZoomInButton"),
       zoomOutButton: doc.getElementById("watchZoomOutButton"),
       zoomResetButton: doc.getElementById("watchZoomResetButton"),
@@ -496,6 +509,15 @@
       setSoundEnabled(state, els, !state.soundEnabled);
     });
     els.alertAudioInput.addEventListener("change", () => handleAudioUpload(state, els));
+    els.bannerButton.addEventListener("click", () => openBannerModal(els));
+    els.bannerCloseButton.addEventListener("click", () => closeBannerModal(els));
+    els.bannerModal.addEventListener("click", (event) => {
+      if (event.target === els.bannerModal) closeBannerModal(els);
+    });
+    els.bannerAddButton.addEventListener("click", () => addBannerFromInput(state, els));
+    els.bannerInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) addBannerFromInput(state, els);
+    });
     els.zoomInButton.addEventListener("click", () => setVisibleBars(state, els, adjustVisibleBars(state.visibleBars, "in")));
     els.zoomOutButton.addEventListener("click", () => setVisibleBars(state, els, adjustVisibleBars(state.visibleBars, "out")));
     els.zoomResetButton.addEventListener("click", () => setVisibleBars(state, els, 120));
@@ -527,6 +549,114 @@
         renderSearchHistory(state, els);
       });
     });
+  }
+
+  function normalizeBannerItems(items) {
+    const source = Array.isArray(items) ? items : [];
+    const seen = new Set();
+    return source
+      .map((item) => {
+        const text = String(item && item.text ? item.text : "").trim();
+        const id = String(item && item.id ? item.id : "");
+        return { id: id || makeBannerId(text), text };
+      })
+      .filter((item) => {
+        if (!item.text || seen.has(item.id)) return false;
+        seen.add(item.id);
+        return true;
+      })
+      .slice(0, 30);
+  }
+
+  function readBannerItems(storage) {
+    try {
+      return normalizeBannerItems(JSON.parse((storage && storage.getItem(BANNER_ITEMS_KEY)) || "[]"));
+    } catch (_) {
+      return [];
+    }
+  }
+
+  function makeBannerId(text) {
+    return `banner-${Date.now().toString(36)}-${Math.abs(hashText(text)).toString(36)}`;
+  }
+
+  function hashText(text) {
+    return String(text || "").split("").reduce((hash, char) => ((hash << 5) - hash + char.charCodeAt(0)) | 0, 0);
+  }
+
+  function saveBannerSettings(state) {
+    root.localStorage.setItem(BANNER_ITEMS_KEY, JSON.stringify(state.bannerItems));
+    root.localStorage.setItem(SELECTED_BANNER_KEY, state.selectedBannerId || "");
+  }
+
+  function selectedBannerText(state) {
+    const item = state.bannerItems.find((banner) => banner.id === state.selectedBannerId);
+    return item ? item.text : "";
+  }
+
+  function renderBannerList(state, els) {
+    if (!els.bannerList) return;
+    if (!state.bannerItems.length) {
+      els.bannerList.innerHTML = '<p class="watch-banner-empty">暂无横幅内容</p>';
+      updateAlertBanner(state, els);
+      return;
+    }
+    els.bannerList.innerHTML = state.bannerItems
+      .map(
+        (item) => `<label class="watch-banner-item">
+          <input type="radio" name="watchBannerChoice" value="${item.id}" ${item.id === state.selectedBannerId ? "checked" : ""} />
+          <span>${escapeHtml(item.text)}</span>
+          <button type="button" data-banner-remove="${item.id}" aria-label="删除横幅">×</button>
+        </label>`
+      )
+      .join("");
+    els.bannerList.querySelectorAll('input[name="watchBannerChoice"]').forEach((input) => {
+      input.addEventListener("change", () => {
+        state.selectedBannerId = input.value;
+        saveBannerSettings(state);
+        updateAlertBanner(state, els);
+      });
+    });
+    els.bannerList.querySelectorAll("[data-banner-remove]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const id = button.dataset.bannerRemove;
+        state.bannerItems = state.bannerItems.filter((item) => item.id !== id);
+        if (state.selectedBannerId === id) state.selectedBannerId = state.bannerItems[0] ? state.bannerItems[0].id : "";
+        saveBannerSettings(state);
+        renderBannerList(state, els);
+      });
+    });
+    updateAlertBanner(state, els);
+  }
+
+  function openBannerModal(els) {
+    if (!els.bannerModal) return;
+    els.bannerModal.hidden = false;
+    if (els.bannerInput) els.bannerInput.focus();
+  }
+
+  function closeBannerModal(els) {
+    if (els.bannerModal) els.bannerModal.hidden = true;
+  }
+
+  function addBannerFromInput(state, els) {
+    const text = String((els.bannerInput && els.bannerInput.value) || "").trim();
+    if (!text) return;
+    const item = { id: makeBannerId(text), text };
+    state.bannerItems = normalizeBannerItems([item, ...state.bannerItems]);
+    state.selectedBannerId = item.id;
+    saveBannerSettings(state);
+    if (els.bannerInput) els.bannerInput.value = "";
+    renderBannerList(state, els);
+  }
+
+  function updateAlertBanner(state, els) {
+    if (!els.alertBanner) return;
+    const text = selectedBannerText(state);
+    const shouldShow = Boolean(state.soundEnabled && state.previousAlertCount >= 2 && text);
+    els.alertBanner.hidden = !shouldShow;
+    const content = els.alertBanner.querySelector("span");
+    if (content) content.textContent = shouldShow ? text : "";
   }
 
   function loadFromInput(state, els) {
@@ -586,6 +716,7 @@
     state.klineByPeriod = {};
     state.previousAlertCount = 0;
     stopAlertLoop(state);
+    updateAlertBanner(state, els);
     els.symbolInput.value = normalized;
     root.localStorage.setItem(LAST_SYMBOL_KEY, normalized);
     root.localStorage.setItem(LAST_CATEGORY_KEY, state.categoryName);
@@ -996,6 +1127,13 @@
     return slots.length ? Math.max(1, ...slots) : 240;
   }
 
+  function intradayPriceValues(rows, quote, average) {
+    return (rows || [])
+      .flatMap((row) => [row.open, row.high, row.low, row.close, quote && quote.prevClose, average])
+      .filter((value) => value !== null && Number.isFinite(Number(value)))
+      .map(Number);
+  }
+
   function drawIntradayChart(svg, rows, info, quote, hoverDate, onHover) {
     if (!svg) return;
     const { w, h, pad, priceBottom, volumeTop, volumeHeight } = intradayLayout();
@@ -1016,7 +1154,7 @@
       averageRows.push({ slot: row.slot, value: volumeTotal > 0 ? weightedTotal / volumeTotal : row.close });
     });
     const lastAverage = averageRows.length ? averageRows[averageRows.length - 1].value : null;
-    const priceScale = chartScale(plotted.flatMap((row) => [row.close, quote && quote.prevClose, lastAverage]).filter((value) => value !== null), pad.top, priceBottom);
+    const priceScale = chartScale(intradayPriceValues(plotted, quote, lastAverage), pad.top, priceBottom);
     const slotMax = intradaySlotMax(plotted);
     const maxVolume = Math.max(...rows.map((row) => row.volume || 0), 1);
     const barW = Math.max(2, (w - pad.left - pad.right) / slotMax - 1);
@@ -1289,6 +1427,7 @@
       stopAlertLoop(state);
     }
     state.previousAlertCount = result.count;
+    updateAlertBanner(state, els);
   }
 
   function setSoundEnabled(state, els, enabled) {
@@ -1297,10 +1436,12 @@
     if (!state.soundEnabled) {
       stopAlertLoop(state);
       if (els.audioStatus) els.audioStatus.textContent = state.uploadedAudioUrl ? "自定义音频已保存" : "默认提示音";
+      updateAlertBanner(state, els);
       return;
     }
     if (els.audioStatus) els.audioStatus.textContent = state.uploadedAudioUrl ? "声音已启用：自定义音频" : "声音已启用：默认提示音";
     if (state.previousAlertCount >= 2) startAlertLoop(state);
+    updateAlertBanner(state, els);
   }
 
   function startAlertLoop(state) {
@@ -1353,18 +1494,29 @@
   async function handleAudioUpload(state, els) {
     const file = els.alertAudioInput.files && els.alertAudioInput.files[0];
     if (!file) return;
-    const dataUrl = await readFileAsDataUrl(file);
     const wasLooping = state.alertLoopActive;
     stopAlertLoop(state);
-    state.uploadedAudioUrl = dataUrl;
+    setUploadedAudioUrl(state, root.URL && root.URL.createObjectURL ? root.URL.createObjectURL(file) : "");
     try {
-      await saveAudioToDb(dataUrl);
+      await saveAudioToDb(file);
       els.audioStatus.textContent = state.soundEnabled ? "声音已启用：自定义音频" : "已保存自定义音频";
     } catch (_) {
-      root.sessionStorage.setItem("stockWatchSessionAudio", dataUrl);
-      els.audioStatus.textContent = state.soundEnabled ? "声音已启用：自定义音频，本会话有效" : "已加载自定义音频，本会话有效";
+      try {
+        const dataUrl = await readFileAsDataUrl(file);
+        setUploadedAudioUrl(state, dataUrl);
+        root.sessionStorage.setItem("stockWatchSessionAudio", dataUrl);
+        els.audioStatus.textContent = state.soundEnabled ? "声音已启用：自定义音频，本会话有效" : "已加载自定义音频，本会话有效";
+      } catch (error) {
+        els.audioStatus.textContent = "音频保存失败，请重新上传";
+      }
     }
     if (wasLooping || (state.soundEnabled && state.previousAlertCount >= 2)) startAlertLoop(state);
+  }
+
+  function setUploadedAudioUrl(state, url) {
+    if (state.uploadedAudioObjectUrl && root.URL && root.URL.revokeObjectURL) root.URL.revokeObjectURL(state.uploadedAudioObjectUrl);
+    state.uploadedAudioUrl = url || "";
+    state.uploadedAudioObjectUrl = state.uploadedAudioUrl.startsWith("blob:") ? state.uploadedAudioUrl : "";
   }
 
   function readFileAsDataUrl(file) {
@@ -1380,17 +1532,19 @@
     return new Promise((resolve, reject) => {
       if (!root.indexedDB) return reject(new Error("IndexedDB unavailable"));
       const request = root.indexedDB.open(AUDIO_DB, 1);
-      request.onupgradeneeded = () => request.result.createObjectStore("files");
+      request.onupgradeneeded = () => {
+        if (!request.result.objectStoreNames.contains("files")) request.result.createObjectStore("files");
+      };
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error);
     });
   }
 
-  async function saveAudioToDb(dataUrl) {
+  async function saveAudioToDb(file) {
     const db = await openAudioDb();
     return new Promise((resolve, reject) => {
       const tx = db.transaction("files", "readwrite");
-      tx.objectStore("files").put(dataUrl, "alert");
+      tx.objectStore("files").put({ blob: file, name: file.name, type: file.type, savedAt: Date.now() }, "alert");
       tx.oncomplete = resolve;
       tx.onerror = () => reject(tx.error);
     });
@@ -1399,7 +1553,7 @@
   async function loadStoredAudio(state, els) {
     const sessionAudio = root.sessionStorage && root.sessionStorage.getItem("stockWatchSessionAudio");
     if (sessionAudio) {
-      state.uploadedAudioUrl = sessionAudio;
+      setUploadedAudioUrl(state, sessionAudio);
       els.audioStatus.textContent = "已加载自定义音频，本会话有效";
       return;
     }
@@ -1409,8 +1563,13 @@
       const request = tx.objectStore("files").get("alert");
       request.onsuccess = () => {
         if (request.result) {
-          state.uploadedAudioUrl = request.result;
-          els.audioStatus.textContent = "已加载自定义音频";
+          if (typeof request.result === "string") {
+            setUploadedAudioUrl(state, request.result);
+            els.audioStatus.textContent = "已加载自定义音频";
+          } else if (request.result.blob && root.URL && root.URL.createObjectURL) {
+            setUploadedAudioUrl(state, root.URL.createObjectURL(request.result.blob));
+            els.audioStatus.textContent = "已加载自定义音频";
+          }
         }
       };
     } catch (_) {
@@ -1450,9 +1609,11 @@
     readSearchHistory,
     addSearchHistory,
     removeSearchHistory,
+    normalizeBannerItems,
     scaleDomain,
     intradayLayout,
     intradaySlotMax,
+    intradayPriceValues,
     initWatchPage,
   };
 });

@@ -1376,6 +1376,11 @@ svg {
   border-color: #1d4ed8;
 }
 
+#watchBannerButton {
+  background: #475569;
+  border-color: #475569;
+}
+
 .watch-audio-bar label {
   display: flex;
   grid-template-columns: none;
@@ -1387,6 +1392,94 @@ svg {
   height: auto;
   padding: 0;
   border: 0;
+}
+
+.watch-banner-modal[hidden] {
+  display: none;
+}
+
+.watch-banner-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(15, 23, 42, 0.28);
+}
+
+.watch-banner-dialog {
+  width: min(520px, 100%);
+  padding: 14px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.22);
+}
+
+.watch-banner-dialog-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.watch-banner-dialog-head h2 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.watch-banner-dialog-head button,
+.watch-banner-item button {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  line-height: 1;
+}
+
+.watch-banner-dialog textarea {
+  min-height: 78px;
+  resize: vertical;
+}
+
+.watch-banner-dialog > button {
+  margin-top: 10px;
+}
+
+.watch-banner-list {
+  display: grid;
+  gap: 8px;
+  max-height: 240px;
+  margin-top: 12px;
+  overflow: auto;
+}
+
+.watch-banner-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+}
+
+.watch-banner-item input {
+  width: 16px;
+  height: 16px;
+}
+
+.watch-banner-item span {
+  color: #0f172a;
+  line-height: 1.45;
+  word-break: break-word;
+}
+
+.watch-banner-empty {
+  margin: 0;
+  color: #64748b;
+  font-size: 13px;
 }
 
 .watch-main-grid {
@@ -1641,11 +1734,48 @@ svg {
   box-shadow: 0 4px 14px rgba(15, 23, 42, 0.05);
 }
 
-.watch-zoom-bar span {
-  margin-right: auto;
+#watchZoomStatus {
   color: #475569;
   font-size: 13px;
   font-weight: 700;
+  white-space: nowrap;
+}
+
+.watch-alert-banner[hidden] {
+  display: none;
+}
+
+.watch-alert-banner {
+  flex: 1 1 420px;
+  min-width: 220px;
+  max-width: 760px;
+  height: 32px;
+  overflow: hidden;
+  border: 1px solid #fecaca;
+  border-radius: 6px;
+  background: #fff1f2;
+}
+
+.watch-alert-banner span {
+  display: inline-block;
+  min-width: 100%;
+  margin: 0;
+  padding-left: 100%;
+  color: #991b1b;
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 30px;
+  white-space: nowrap;
+  animation: watch-marquee 12s linear infinite;
+}
+
+@keyframes watch-marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-100%);
+  }
 }
 
 .watch-zoom-bar button {

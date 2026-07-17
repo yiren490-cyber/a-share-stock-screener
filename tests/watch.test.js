@@ -168,6 +168,9 @@ assert.deepStrictEqual(watch.addSearchHistory([{ symbol: "sh600519", name: "贵�
 assert.deepStrictEqual(watch.removeSearchHistory([{ symbol: "sz300750", name: "宁德时代" }, { symbol: "sh600519", name: "贵州茅台" }], "300750"), [
   { symbol: "sh600519", name: "贵州茅台" },
 ]);
+assert.deepStrictEqual(watch.normalizeBannerItems([{ id: "a", text: "  预警一  " }, { id: "a", text: "重复" }, { id: "b", text: "" }]), [
+  { id: "a", text: "预警一" },
+]);
 
 const paddedDomain = watch.scaleDomain([10, 12], 0.1);
 assert.strictEqual(paddedDomain.min, 9.8);
@@ -184,6 +187,11 @@ assert(intradayLayout.volumeHeight >= 200, "intraday volume area should be tall 
 assert(intradayLayout.volumeTop < intradayLayout.priceBottom, "intraday volume can overlap the price area");
 assert.strictEqual(watch.intradaySlotMax([{ slot: 0 }, { slot: 60 }, { slot: 135 }]), 135);
 assert.strictEqual(watch.intradaySlotMax([]), 240);
+assert.deepStrictEqual(
+  watch.intradayPriceValues([{ open: 10, high: 12, low: 8, close: 11 }], { prevClose: 9 }, 10.5),
+  [10, 12, 8, 11, 9, 10.5],
+  "intraday scale should use OHLC, previous close, and average"
+);
 
 const intradayInfo = watch.renderIntradayInfoHtml({
   time: "2026-07-17 09:30",
