@@ -496,6 +496,7 @@
       enableSoundButton: doc.getElementById("enableSoundButton"),
       alertAudioInput: doc.getElementById("alertAudioInput"),
       alertAudioSelect: doc.getElementById("alertAudioSelect"),
+      deleteAudioButton: doc.getElementById("deleteAudioButton"),
       audioStatus: doc.getElementById("audioStatus"),
       bannerButton: doc.getElementById("watchBannerButton"),
       bannerModal: doc.getElementById("watchBannerModal"),
@@ -532,6 +533,10 @@
     els.alertAudioSelect.addEventListener("change", async () => {
       if (state.audioReadyPromise) await state.audioReadyPromise;
       selectAlertAudio(state, els, els.alertAudioSelect.value);
+    });
+    els.deleteAudioButton.addEventListener("click", async () => {
+      if (state.audioReadyPromise) await state.audioReadyPromise;
+      await deleteSelectedAudio(state, els);
     });
     els.bannerButton.addEventListener("click", () => openBannerModal(els));
     els.bannerCloseButton.addEventListener("click", () => closeBannerModal(els));
@@ -662,11 +667,12 @@
     }
     els.bannerList.innerHTML = state.bannerItems
       .map(
-        (item) => `<label class="watch-banner-item">
+        (item) => `<div class="watch-banner-item">
           <input type="radio" name="watchBannerChoice" value="${item.id}" ${item.id === state.selectedBannerId ? "checked" : ""} />
-          <span>${escapeHtml(item.text)}</span>
+          <textarea rows="2" data-banner-edit="${item.id}">${escapeHtml(item.text)}</textarea>
+          <button type="button" data-banner-save="${item.id}">保存</button>
           <button type="button" data-banner-remove="${item.id}" aria-label="删除横幅">×</button>
-        </label>`
+        </div>`
       )
       .join("");
     els.bannerList.querySelectorAll('input[name="watchBannerChoice"]').forEach((input) => {
@@ -674,6 +680,17 @@
         state.selectedBannerId = input.value;
         saveBannerSettings(state);
         updateAlertBanner(state, els);
+      });
+    });
+    els.bannerList.querySelectorAll("[data-banner-save]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const id = button.dataset.bannerSave;
+        const input = els.bannerList.querySelector(`[data-banner-edit="${id}"]`);
+        const text = String((input && input.value) || "").trim();
+        if (!text) return;
+        state.bannerItems = state.bannerItems.map((item) => (item.id === id ? { ...item, text } : item));
+        saveBannerSettings(state);
+        renderBannerList(state, els);
       });
     });
     els.bannerList.querySelectorAll("[data-banner-remove]").forEach((button) => {
@@ -789,6 +806,30 @@
     saveStockNotes(root.localStorage, state.notesBySymbol);
   }
 
+  function updateStockNote(state, symbol, type, id, text) {
+    const normalizedSymbol = normalizeSymbol(symbol);
+    const clean = String(text || "").trim();
+    if (!normalizedSymbol || !clean || !state.notesBySymbol[normalizedSymbol] || !state.notesBySymbol[normalizedSymbol][type]) return false;
+    let changed = false;
+    state.notesBySymbol[normalizedSymbol][type] = state.notesBySymbol[normalizedSymbol][type].map((note) => {
+      if (note.id !== id) return note;
+      changed = true;
+      return { ...note, text: clean };
+    });
+    if (changed) saveStockNotes(root.localStorage, state.notesBySymbol);
+    return changed;
+  }
+
+  function hasNotesForSymbol(state, symbol) {
+    const normalizedSymbol = normalizeSymbol(symbol);
+    const groups = normalizedSymbol && state.notesBySymbol[normalizedSymbol];
+    return Boolean(groups && NOTE_TYPES.some(({ key }) => Array.isArray(groups[key]) && groups[key].length));
+  }
+
+  function updateNotesButtonState(state, els) {
+    if (els.notesButton) els.notesButton.classList.toggle("has-notes", hasNotesForSymbol(state, state.symbol));
+  }
+
   function noteTime(createdAt) {
     const date = new Date(Number(createdAt) || Date.now());
     return date.toLocaleString("zh-CN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
@@ -802,8 +843,7 @@
       .map(
         (note) => `<article class="watch-note-item">
           <time>${escapeHtml(noteTime(note.createdAt))}</time>
-          <p>${escapeHtml(note.text)}</p>
-          ${editable ? `<button type="button" data-note-delete="${note.id}" aria-label="删除笔记">删除</button>` : ""}
+          ${editable ? `<textarea rows="3" data-note-edit="${note.id}">${escapeHtml(note.text)}</textarea><div class="watch-note-actions"><button type="button" data-note-save="${note.id}">保存</button><button type="button" data-note-delete="${note.id}" aria-label="删除笔记">删除</button></div>` : `<p>${escapeHtml(note.text)}</p>`}
         </article>`
       )
       .join("")}</div>`;
@@ -838,14 +878,20 @@
       button.addEventListener("click", () => {
         const type = button.dataset.noteAdd;
         const input = els.notesEditor.querySelector(`[data-note-input="${type}"]`);
-        if (addStockNote(state, state.symbol, type, input && input.value)) renderNotesEditor(state, els);
+        if (addStockNote(state, state.symbol, type, input && input.value)) {
+          updateNotesButtonState(state, els);
+          renderNotesEditor(state, els);
+        }
       });
     });
     els.notesEditor.querySelectorAll("[data-note-input]").forEach((input) => {
       input.addEventListener("keydown", (event) => {
         if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
           const type = input.dataset.noteInput;
-          if (addStockNote(state, state.symbol, type, input.value)) renderNotesEditor(state, els);
+          if (addStockNote(state, state.symbol, type, input.value)) {
+            updateNotesButtonState(state, els);
+            renderNotesEditor(state, els);
+          }
         }
       });
     });
@@ -853,7 +899,16 @@
       button.addEventListener("click", () => {
         const type = button.closest("[data-note-type]").dataset.noteType;
         removeStockNote(state, state.symbol, type, button.dataset.noteDelete);
+        updateNotesButtonState(state, els);
         renderNotesEditor(state, els);
+      });
+    });
+    els.notesEditor.querySelectorAll("[data-note-save]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const type = button.closest("[data-note-type]").dataset.noteType;
+        const id = button.dataset.noteSave;
+        const input = els.notesEditor.querySelector(`[data-note-edit="${id}"]`);
+        if (updateStockNote(state, state.symbol, type, id, input && input.value)) renderNotesEditor(state, els);
       });
     });
   }
@@ -961,6 +1016,7 @@
     updateAlertBanner(state, els);
     hideNotesPreview(els);
     if (els.notesModal) els.notesModal.hidden = true;
+    updateNotesButtonState(state, els);
     els.symbolInput.value = normalized;
     root.localStorage.setItem(LAST_SYMBOL_KEY, normalized);
     root.localStorage.setItem(LAST_CATEGORY_KEY, state.categoryName);
@@ -1187,6 +1243,7 @@
     renderPriceBadge(els.priceBadge, price, change);
     renderOrderBook(els.orderBook, quote ? quote.orderBook : [], quote, state.klineByPeriod.m1 || []);
     updateNavigator(state, els);
+    updateNotesButtonState(state, els);
   }
 
   function renderPriceBadge(node, price, change) {
@@ -1874,6 +1931,18 @@
     updateStoredAudioMarker(state, els);
   }
 
+  async function deleteSelectedAudio(state, els) {
+    const id = state.selectedAudioId || (els.alertAudioSelect && els.alertAudioSelect.value);
+    if (!id) return;
+    const wasLooping = state.alertLoopActive;
+    stopAlertLoop(state);
+    await deleteAudioFromDb(id);
+    state.audioItems = state.audioItems.filter((item) => item.id !== id);
+    const nextId = (state.audioItems[0] && state.audioItems[0].id) || "";
+    selectAlertAudio(state, els, nextId);
+    if (wasLooping || (state.soundEnabled && state.previousAlertCount >= 2)) startAlertLoop(state);
+  }
+
   function renderAudioPicker(state, els) {
     const items = state.audioItems || [];
     if (els.alertAudioSelect) {
@@ -1882,6 +1951,7 @@
         : '<option value="">默认提示音</option>';
       els.alertAudioSelect.disabled = !items.length;
     }
+    if (els.deleteAudioButton) els.deleteAudioButton.disabled = !items.length || !state.selectedAudioId;
     if (els.audioStatus) {
       const item = items.find((audio) => audio.id === state.selectedAudioId);
       els.audioStatus.textContent = item ? `当前音频：${item.name || "预警音频"}` : "当前音频：默认提示音";
@@ -1917,6 +1987,18 @@
       };
       tx.oncomplete = () => resolve(items);
       request.onerror = () => reject(request.error);
+      tx.onerror = () => reject(tx.error);
+    });
+  }
+
+  async function deleteAudioFromDb(id) {
+    const db = await openAudioDb();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction("files", "readwrite");
+      const store = tx.objectStore("files");
+      store.delete(`audio:${id}`);
+      if (id === "legacy-alert") store.delete("alert");
+      tx.oncomplete = resolve;
       tx.onerror = () => reject(tx.error);
     });
   }
@@ -1958,6 +2040,8 @@
     normalizeBannerItems,
     readQuoteNameCache,
     normalizeStockNotes,
+    updateStockNote,
+    hasNotesForSymbol,
     scaleDomain,
     intradayLayout,
     intradaySlotMax,
@@ -1965,6 +2049,7 @@
     drawIntradayChart,
     mergeAudioItems,
     hasStoredAlertAudio,
+    deleteAudioFromDb,
     initWatchPage,
   };
 });

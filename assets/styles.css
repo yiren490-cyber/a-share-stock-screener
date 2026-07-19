@@ -1430,6 +1430,12 @@ svg {
   height: 34px;
 }
 
+#deleteAudioButton {
+  min-width: 82px;
+  background: #475569;
+  border-color: #475569;
+}
+
 #audioStatus {
   max-width: 360px;
   overflow: hidden;
@@ -1503,7 +1509,7 @@ svg {
 
 .watch-banner-item {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr) 48px 30px;
   align-items: center;
   gap: 8px;
   padding: 8px;
@@ -1514,6 +1520,15 @@ svg {
 .watch-banner-item input {
   width: 16px;
   height: 16px;
+}
+
+.watch-banner-item textarea {
+  min-height: 48px;
+  resize: vertical;
+}
+
+.watch-banner-item button[data-banner-save] {
+  width: 48px;
 }
 
 .watch-banner-item span {
@@ -1606,11 +1621,18 @@ svg {
 .watch-notes-button {
   flex: 0 0 auto;
   height: 26px;
+  min-width: 30px;
   padding: 0 8px;
   border-color: #cbd5e1;
   background: #f8fafc;
   color: #1d4ed8;
   font-size: 12px;
+}
+
+.watch-notes-button.has-notes {
+  border-color: #f59e0b;
+  background: #fffbeb;
+  color: #b45309;
 }
 
 .watch-notes-popover[hidden],
@@ -1721,6 +1743,26 @@ svg {
   grid-template-rows: repeat(3, minmax(0, 1fr));
 }
 
+.watch-notes-popover .watch-note-column {
+  min-height: 286px;
+}
+
+.watch-notes-popover .watch-note-items {
+  grid-auto-rows: 76px;
+  grid-template-rows: none;
+}
+
+.watch-notes-popover .watch-note-item {
+  height: 76px;
+}
+
+.watch-notes-popover .watch-note-item p {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
 .watch-note-item {
   min-height: 0;
   overflow: auto;
@@ -1746,13 +1788,37 @@ svg {
   white-space: pre-wrap;
 }
 
+.watch-note-item textarea {
+  width: 100%;
+  min-height: 72px;
+  resize: vertical;
+}
+
+.watch-note-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
 .watch-note-item button {
   margin-top: 8px;
   height: 26px;
   padding: 0 8px;
+  font-size: 12px;
+}
+
+.watch-note-actions button {
+  margin-top: 0;
+}
+
+.watch-note-actions button[data-note-save] {
+  background: #1d4ed8;
+  border-color: #1d4ed8;
+}
+
+.watch-note-actions button[data-note-delete] {
   background: #dc2626;
   border-color: #dc2626;
-  font-size: 12px;
 }
 
 .watch-note-empty {

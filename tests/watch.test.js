@@ -243,5 +243,14 @@ assert.deepStrictEqual(watch.normalizeStockNotes({
     news: [],
   },
 });
+const oldLocalStorage = globalThis.localStorage;
+const savedNotes = {};
+globalThis.localStorage = { setItem(key, value) { savedNotes[key] = value; } };
+const noteState = { notesBySymbol: { sh600519: { watch: [{ id: "n1", text: "旧内容", createdAt: 10 }], trend: [], news: [] } } };
+assert.strictEqual(watch.hasNotesForSymbol(noteState, "600519"), true);
+assert.strictEqual(watch.updateStockNote(noteState, "600519", "watch", "n1", "新内容"), true);
+assert.deepStrictEqual(noteState.notesBySymbol.sh600519.watch, [{ id: "n1", text: "新内容", createdAt: 10 }]);
+assert(savedNotes.stockWatchNotes.includes("新内容"));
+globalThis.localStorage = oldLocalStorage;
 
 console.log("watch helper tests passed");
