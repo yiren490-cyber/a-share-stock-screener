@@ -64,7 +64,11 @@
         <section class="watch-realtime-panel">
           <div class="watch-section-header">
             <div>
-              <h2 id="watchStockTitle">未选择股票</h2>
+              <div class="watch-title-row">
+                <h2 id="watchStockTitle">未选择股票</h2>
+                <button id="watchNotesButton" class="watch-notes-button" type="button" aria-label="股票笔记" title="股票笔记">✎</button>
+                <div id="watchNotesPreview" class="watch-notes-popover" hidden></div>
+              </div>
               <p id="watchStockMeta">--</p>
             </div>
             <div id="watchPriceBadge" class="watch-price-badge">--</div>
@@ -90,6 +94,16 @@
         <button id="watchZoomResetButton" type="button">重置</button>
       </section>
       <section id="periodPanels" class="watch-period-grid" aria-label="周期图"></section>
+
+      <div id="watchNotesModal" class="watch-notes-modal" hidden>
+        <div class="watch-notes-dialog" role="dialog" aria-modal="true" aria-labelledby="watchNotesTitle">
+          <div class="watch-notes-dialog-head">
+            <h2 id="watchNotesTitle">股票笔记</h2>
+            <button id="watchNotesCloseButton" type="button" aria-label="关闭">×</button>
+          </div>
+          <div id="watchNotesEditor" class="watch-notes-columns"></div>
+        </div>
+      </div>
     </main>
 
     <script src="assets/listing-dates.js"></script>

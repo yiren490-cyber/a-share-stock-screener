@@ -230,5 +230,18 @@ assert.deepStrictEqual(watch.mergeAudioItems([{ id: "a", name: "旧", savedAt: 1
   { id: "b", name: "另一个", savedAt: 1 },
   { id: "a", name: "新", savedAt: 2 },
 ]);
+assert.deepStrictEqual(watch.normalizeStockNotes({
+  sh600519: {
+    watch: [{ id: "old", text: "旧笔记", createdAt: 1 }, { id: "new", text: "新笔记", createdAt: 2 }, { id: "empty", text: " ", createdAt: 3 }],
+    trend: [{ id: "trend", text: "趋势", createdAt: 1 }],
+  },
+  bad: { watch: [{ text: "忽略" }] },
+}), {
+  sh600519: {
+    watch: [{ id: "new", text: "新笔记", createdAt: 2 }, { id: "old", text: "旧笔记", createdAt: 1 }],
+    trend: [{ id: "trend", text: "趋势", createdAt: 1 }],
+    news: [],
+  },
+});
 
 console.log("watch helper tests passed");

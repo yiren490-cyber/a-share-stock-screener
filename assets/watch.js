@@ -28,6 +28,12 @@
   const SELECTED_BANNER_KEY = "stockWatchSelectedBanner";
   const QUOTE_NAME_CACHE_KEY = "stockWatchQuoteNames";
   const SELECTED_AUDIO_KEY = "stockWatchSelectedAudioId";
+  const STOCK_NOTES_KEY = "stockWatchNotes";
+  const NOTE_TYPES = [
+    { key: "watch", label: "盯盘笔记" },
+    { key: "trend", label: "K线趋势分析" },
+    { key: "news", label: "消息面行情分析" },
+  ];
   const QUOTE_REFRESH_MS = 500;
   const KLINE_REFRESH_MS = 1500;
   const AUDIO_DB = "stockWatchAudio";
@@ -443,6 +449,7 @@
       alertLoopActive: false,
       bannerItems: readBannerItems(root.localStorage),
       selectedBannerId: root.localStorage.getItem(SELECTED_BANNER_KEY) || "",
+      notesBySymbol: readStockNotes(root.localStorage),
       quoteLoading: false,
       klineLoading: false,
       lastStatusAt: 0,
@@ -474,6 +481,11 @@
       nextButton: doc.getElementById("watchNextButton"),
       categoryList: doc.getElementById("watchCategoryList"),
       stockTitle: doc.getElementById("watchStockTitle"),
+      notesButton: doc.getElementById("watchNotesButton"),
+      notesPreview: doc.getElementById("watchNotesPreview"),
+      notesModal: doc.getElementById("watchNotesModal"),
+      notesCloseButton: doc.getElementById("watchNotesCloseButton"),
+      notesEditor: doc.getElementById("watchNotesEditor"),
       stockMeta: doc.getElementById("watchStockMeta"),
       priceBadge: doc.getElementById("watchPriceBadge"),
       intradayChart: doc.getElementById("intradayChart"),
@@ -529,6 +541,13 @@
     els.bannerAddButton.addEventListener("click", () => addBannerFromInput(state, els));
     els.bannerInput.addEventListener("keydown", (event) => {
       if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) addBannerFromInput(state, els);
+    });
+    els.notesButton.addEventListener("mouseenter", () => showNotesPreview(state, els));
+    els.notesButton.addEventListener("mouseleave", () => hideNotesPreview(els));
+    els.notesButton.addEventListener("click", () => openNotesModal(state, els));
+    els.notesCloseButton.addEventListener("click", () => closeNotesModal(els));
+    els.notesModal.addEventListener("click", (event) => {
+      if (event.target === els.notesModal) closeNotesModal(els);
     });
     els.zoomInButton.addEventListener("click", () => setVisibleBars(state, els, adjustVisibleBars(state.visibleBars, "in")));
     els.zoomOutButton.addEventListener("click", () => setVisibleBars(state, els, adjustVisibleBars(state.visibleBars, "out")));
@@ -699,6 +718,156 @@
     if (content) content.textContent = shouldShow ? text : "";
   }
 
+  function normalizeStockNotes(value) {
+    const source = value && typeof value === "object" ? value : {};
+    return Object.fromEntries(
+      Object.entries(source)
+        .map(([symbol, groups]) => {
+          const normalizedSymbol = normalizeSymbol(symbol);
+          if (!normalizedSymbol || !groups || typeof groups !== "object") return null;
+          const normalizedGroups = Object.fromEntries(
+            NOTE_TYPES.map(({ key }) => [
+              key,
+              (Array.isArray(groups[key]) ? groups[key] : [])
+                .map((note) => ({
+                  id: String(note && note.id ? note.id : makeNoteId()),
+                  text: String(note && note.text ? note.text : "").trim(),
+                  createdAt: Number(note && note.createdAt) || Date.now(),
+                }))
+                .filter((note) => note.text)
+                .sort((a, b) => b.createdAt - a.createdAt),
+            ])
+          );
+          return [normalizedSymbol, normalizedGroups];
+        })
+        .filter(Boolean)
+    );
+  }
+
+  function readStockNotes(storage) {
+    try {
+      return normalizeStockNotes(JSON.parse((storage && storage.getItem(STOCK_NOTES_KEY)) || "{}"));
+    } catch (_) {
+      return {};
+    }
+  }
+
+  function saveStockNotes(storage, notesBySymbol) {
+    storage.setItem(STOCK_NOTES_KEY, JSON.stringify(notesBySymbol || {}));
+  }
+
+  function defaultNoteGroups() {
+    return Object.fromEntries(NOTE_TYPES.map(({ key }) => [key, []]));
+  }
+
+  function notesForSymbol(state) {
+    const symbol = normalizeSymbol(state && state.symbol);
+    if (!symbol) return defaultNoteGroups();
+    if (!state.notesBySymbol[symbol]) state.notesBySymbol[symbol] = defaultNoteGroups();
+    return state.notesBySymbol[symbol];
+  }
+
+  function makeNoteId() {
+    return `note-${Date.now().toString(36)}-${Math.round(Math.random() * 100000).toString(36)}`;
+  }
+
+  function addStockNote(state, symbol, type, text) {
+    const normalizedSymbol = normalizeSymbol(symbol);
+    const clean = String(text || "").trim();
+    if (!normalizedSymbol || !NOTE_TYPES.some((item) => item.key === type) || !clean) return null;
+    if (!state.notesBySymbol[normalizedSymbol]) state.notesBySymbol[normalizedSymbol] = defaultNoteGroups();
+    const note = { id: makeNoteId(), text: clean, createdAt: Date.now() };
+    state.notesBySymbol[normalizedSymbol][type] = [note, ...state.notesBySymbol[normalizedSymbol][type]].sort((a, b) => b.createdAt - a.createdAt);
+    saveStockNotes(root.localStorage, state.notesBySymbol);
+    return note;
+  }
+
+  function removeStockNote(state, symbol, type, id) {
+    const normalizedSymbol = normalizeSymbol(symbol);
+    if (!normalizedSymbol || !state.notesBySymbol[normalizedSymbol] || !state.notesBySymbol[normalizedSymbol][type]) return;
+    state.notesBySymbol[normalizedSymbol][type] = state.notesBySymbol[normalizedSymbol][type].filter((note) => note.id !== id);
+    saveStockNotes(root.localStorage, state.notesBySymbol);
+  }
+
+  function noteTime(createdAt) {
+    const date = new Date(Number(createdAt) || Date.now());
+    return date.toLocaleString("zh-CN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
+  }
+
+  function renderNoteItems(notes, limit = Infinity, editable = false) {
+    const shown = (notes || []).slice(0, limit);
+    if (!shown.length) return '<div class="watch-note-empty">暂无笔记</div>';
+    const countClass = `count-${Math.min(shown.length, 3)}`;
+    return `<div class="watch-note-items ${countClass}">${shown
+      .map(
+        (note) => `<article class="watch-note-item">
+          <time>${escapeHtml(noteTime(note.createdAt))}</time>
+          <p>${escapeHtml(note.text)}</p>
+          ${editable ? `<button type="button" data-note-delete="${note.id}" aria-label="删除笔记">删除</button>` : ""}
+        </article>`
+      )
+      .join("")}</div>`;
+  }
+
+  function renderNotesPreview(state, els) {
+    const groups = notesForSymbol(state);
+    els.notesPreview.innerHTML = NOTE_TYPES.map(({ key, label }) => `<section class="watch-note-column"><h3>${label}</h3>${renderNoteItems(groups[key], 3, false)}</section>`).join("");
+  }
+
+  function showNotesPreview(state, els) {
+    if (!els.notesPreview || els.notesModal.hidden === false) return;
+    renderNotesPreview(state, els);
+    els.notesPreview.hidden = false;
+  }
+
+  function hideNotesPreview(els) {
+    if (els.notesPreview) els.notesPreview.hidden = true;
+  }
+
+  function renderNotesEditor(state, els) {
+    const groups = notesForSymbol(state);
+    els.notesEditor.innerHTML = NOTE_TYPES.map(
+      ({ key, label }) => `<section class="watch-note-column" data-note-type="${key}">
+        <h3>${label}</h3>
+        <textarea rows="3" data-note-input="${key}"></textarea>
+        <button type="button" data-note-add="${key}">添加笔记</button>
+        ${renderNoteItems(groups[key], Infinity, true)}
+      </section>`
+    ).join("");
+    els.notesEditor.querySelectorAll("[data-note-add]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const type = button.dataset.noteAdd;
+        const input = els.notesEditor.querySelector(`[data-note-input="${type}"]`);
+        if (addStockNote(state, state.symbol, type, input && input.value)) renderNotesEditor(state, els);
+      });
+    });
+    els.notesEditor.querySelectorAll("[data-note-input]").forEach((input) => {
+      input.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
+          const type = input.dataset.noteInput;
+          if (addStockNote(state, state.symbol, type, input.value)) renderNotesEditor(state, els);
+        }
+      });
+    });
+    els.notesEditor.querySelectorAll("[data-note-delete]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const type = button.closest("[data-note-type]").dataset.noteType;
+        removeStockNote(state, state.symbol, type, button.dataset.noteDelete);
+        renderNotesEditor(state, els);
+      });
+    });
+  }
+
+  function openNotesModal(state, els) {
+    hideNotesPreview(els);
+    renderNotesEditor(state, els);
+    els.notesModal.hidden = false;
+  }
+
+  function closeNotesModal(els) {
+    if (els.notesModal) els.notesModal.hidden = true;
+  }
+
   function loadFromInput(state, els) {
     const symbol = normalizeSymbol(els.symbolInput.value);
     if (!symbol) {
@@ -790,6 +959,8 @@
     state.previousAlertCount = 0;
     stopAlertLoop(state);
     updateAlertBanner(state, els);
+    hideNotesPreview(els);
+    if (els.notesModal) els.notesModal.hidden = true;
     els.symbolInput.value = normalized;
     root.localStorage.setItem(LAST_SYMBOL_KEY, normalized);
     root.localStorage.setItem(LAST_CATEGORY_KEY, state.categoryName);
@@ -1786,6 +1957,7 @@
     removeSearchHistory,
     normalizeBannerItems,
     readQuoteNameCache,
+    normalizeStockNotes,
     scaleDomain,
     intradayLayout,
     intradaySlotMax,
