@@ -4,6 +4,7 @@ const path = require("path");
 const vm = require("vm");
 
 const appSource = fs.readFileSync(path.join(__dirname, "..", "assets", "app.js"), "utf8");
+const stylesSource = fs.readFileSync(path.join(__dirname, "..", "assets", "styles.css"), "utf8");
 
 function makeNode() {
   const node = {
@@ -200,5 +201,13 @@ assert.strictEqual(backtestSummary.t2.winRate, 50);
 assert.strictEqual(backtestSummary.t2.avgPct, 1.5);
 assert.strictEqual(backtestSummary.t3.winRate, 100);
 assert.strictEqual(backtestSummary.t3.avgPct, 3);
+
+const chartControlsRule = stylesSource.match(/\.chart-controls\s*\{[^}]*\}/);
+assert(chartControlsRule, "chart controls CSS rule should exist");
+assert(!/overflow:\s*hidden;/.test(chartControlsRule[0]), "main chart controls should not clip the MA multi-select menu");
+
+const chartInfoDivRule = stylesSource.match(/\.chart-info div\s*\{[^}]*\}/);
+assert(chartInfoDivRule, "chart info row CSS rule should exist");
+assert(!/max-height:\s*18px;/.test(chartInfoDivRule[0]), "main chart MA values should not be clipped to one 18px row");
 
 console.log("indicator-screening tests passed");

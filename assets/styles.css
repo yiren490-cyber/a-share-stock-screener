@@ -900,7 +900,7 @@ tbody tr.selected {
   gap: 6px;
   margin-bottom: 14px;
   align-items: end;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .chart-controls > * {
@@ -1073,7 +1073,7 @@ tbody tr.selected {
 }
 
 .chart-info {
-  height: 52px;
+  min-height: 52px;
   margin-bottom: 6px;
   padding: 6px 8px;
   border: 1px solid #e2e8f0;
@@ -1084,7 +1084,7 @@ tbody tr.selected {
   font-weight: 700;
   line-height: 1.55;
   white-space: normal;
-  overflow: hidden;
+  overflow: visible;
   contain: layout paint;
 }
 
@@ -1092,8 +1092,8 @@ tbody tr.selected {
   display: flex;
   flex-wrap: wrap;
   gap: 6px 12px;
-  max-height: 18px;
-  overflow: hidden;
+  max-height: none;
+  overflow: visible;
   text-overflow: clip;
   white-space: normal;
 }
