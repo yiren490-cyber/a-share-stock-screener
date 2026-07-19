@@ -215,4 +215,18 @@ assert(chartInfoRule, "chart info CSS rule should exist");
 assert(/height:\s*52px;/.test(chartInfoRule[0]), "main chart info should keep a fixed height so indicator switching does not reflow the detail panel");
 assert(/overflow:\s*auto;/.test(chartInfoRule[0]), "main chart info should scroll overflowing MA values instead of expanding during indicator switching");
 
+const renderSelectedChartsSource = appSource.match(/function renderSelectedCharts\(\) \{[\s\S]*?\n  \}/);
+assert(renderSelectedChartsSource, "renderSelectedCharts should exist");
+assert(
+  !renderSelectedChartsSource[0].includes("registerInitialHover"),
+  "chart rerenders should not synchronously initialize all crosshairs and chart info; mouse movement can sync them on demand"
+);
+
+assert(appSource.includes("function renderMainChartOnly()"), "main indicator changes should have a main-chart-only render path");
+assert(appSource.includes("function renderSubChartsOnly()"), "subchart indicator changes should have a subchart-only render path");
+assert(
+  /els\.mainIndicatorSelect\.addEventListener\("change", \(\) => \{[\s\S]*?renderMainChartOnly\(\);[\s\S]*?\}\);/.test(appSource),
+  "main indicator changes should not rerender subcharts"
+);
+
 console.log("indicator-screening tests passed");

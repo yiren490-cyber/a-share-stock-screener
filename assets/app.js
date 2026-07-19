@@ -3121,12 +3121,6 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
     }
   }
 
-  function registerInitialHover(rows) {
-    if (!rows.length) return;
-    state.hoverIndex = rows.length - 1;
-    requestAnimationFrame(() => updateAllCrosshairs(state.hoverIndex, els.mainChart));
-  }
-
   function currentMainIndicator() {
     const value = els.mainIndicatorSelect.value;
     if (value.startsWith("custom-main-")) {
@@ -3388,7 +3382,7 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
     });
     select.addEventListener("change", () => {
       state.subChartIndicators[index] = select.value;
-      renderSelectedCharts();
+      renderSubChartsOnly();
     });
     title.append(name, select);
     return title;
@@ -3799,7 +3793,27 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
     }
     renderMainChart(state.selectedRows);
     renderSubCharts(state.selectedRows);
-    registerInitialHover(visibleRows(state.selectedRows));
+  }
+
+  function renderMainChartOnly() {
+    if (!state.selectedRows.length) {
+      renderSelectedCharts();
+      return;
+    }
+    renderMainChart(state.selectedRows);
+  }
+
+  function renderSubChartsOnly() {
+    if (!state.selectedRows.length) {
+      renderSelectedCharts();
+      return;
+    }
+    const subChartSvgs = [];
+    state.chartMetas.forEach((_, svg) => {
+      if (svg !== els.mainChart) subChartSvgs.push(svg);
+    });
+    subChartSvgs.forEach((svg) => state.chartMetas.delete(svg));
+    renderSubCharts(state.selectedRows);
   }
 
   async function selectQuote(symbol) {
@@ -4001,13 +4015,13 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
     });
     els.maPeriodsInput.addEventListener("change", () => {
       updateMaFilterLabel();
-      renderSelectedCharts();
+      renderMainChartOnly();
     });
     els.mainIndicatorSelect.addEventListener("change", () => {
       updateMainControlVisibility();
-      renderSelectedCharts();
+      renderMainChartOnly();
     });
-    els.subChartCountSelect.addEventListener("change", renderSelectedCharts);
+    els.subChartCountSelect.addEventListener("change", renderSubChartsOnly);
     els.periodSelect.addEventListener("change", () => {
       if (state.selected) selectQuote(state.selected.symbol);
     });
