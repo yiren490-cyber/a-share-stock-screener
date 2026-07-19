@@ -210,4 +210,9 @@ const chartInfoDivRule = stylesSource.match(/\.chart-info div\s*\{[^}]*\}/);
 assert(chartInfoDivRule, "chart info row CSS rule should exist");
 assert(!/max-height:\s*18px;/.test(chartInfoDivRule[0]), "main chart MA values should not be clipped to one 18px row");
 
+const chartInfoRule = stylesSource.match(/\.chart-info\s*\{[^}]*\}/);
+assert(chartInfoRule, "chart info CSS rule should exist");
+assert(/height:\s*52px;/.test(chartInfoRule[0]), "main chart info should keep a fixed height so indicator switching does not reflow the detail panel");
+assert(/overflow:\s*auto;/.test(chartInfoRule[0]), "main chart info should scroll overflowing MA values instead of expanding during indicator switching");
+
 console.log("indicator-screening tests passed");
