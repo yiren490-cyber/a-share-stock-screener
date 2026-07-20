@@ -122,6 +122,20 @@ assert.deepStrictEqual(tradeRows, [
   { time: "09:31", price: 10.2, volume: 12000 },
 ]);
 
+assert.deepStrictEqual(
+  watch.latestTradingDayRows([
+    { date: "2026-07-16 14:59", close: 9.8 },
+    { date: "2026-07-16 15:00", close: 9.9 },
+    { date: "2026-07-17 09:30", close: 10 },
+    { date: "2026-07-17 09:31", close: 10.1 },
+  ]),
+  [
+    { date: "2026-07-17 09:30", close: 10 },
+    { date: "2026-07-17 09:31", close: 10.1 },
+  ],
+  "intraday chart should only use rows from the latest trading day"
+);
+
 const orderHtml = watch.renderOrderBookHtml(
   [
     { side: "buy", level: 1, price: 9.9, volume: 100 },

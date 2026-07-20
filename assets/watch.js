@@ -182,6 +182,13 @@
       }));
   }
 
+  function latestTradingDayRows(rows) {
+    const latestRow = [...(rows || [])].reverse().find((row) => row && typeof row.date === "string" && row.date.length >= 10);
+    if (!latestRow) return [];
+    const latestDate = latestRow.date.slice(0, 10);
+    return rows.filter((row) => row && typeof row.date === "string" && row.date.slice(0, 10) === latestDate);
+  }
+
   function normalizeSearchHistory(history, limit = 12) {
     return (Array.isArray(history) ? history : [])
       .map((item) => {
@@ -1241,7 +1248,7 @@
     els.stockTitle.textContent = title;
     els.stockMeta.textContent = quote ? `${quote.rawTime || "--"}  昨收 ${formatNumber(quote.prevClose)}  今开 ${formatNumber(quote.open)}` : "--";
     renderPriceBadge(els.priceBadge, price, change);
-    renderOrderBook(els.orderBook, quote ? quote.orderBook : [], quote, state.klineByPeriod.m1 || []);
+    renderOrderBook(els.orderBook, quote ? quote.orderBook : [], quote, latestTradingDayRows(state.klineByPeriod.m1 || []));
     updateNavigator(state, els);
     updateNotesButtonState(state, els);
   }
@@ -1294,7 +1301,7 @@
   }
 
   function renderIntraday(state, els) {
-    const rows = (state.klineByPeriod.m1 || []).slice(-240);
+    const rows = latestTradingDayRows(state.klineByPeriod.m1 || []);
     drawIntradayChart(els.intradayChart, rows, els.intradayInfo, state.quote, state.hoverDate, (row) => {
       state.hoverDate = row.date;
       renderIntraday(state, els);
@@ -1723,7 +1730,7 @@
   }
 
   function updateAlerts(state, els) {
-    const m1 = state.klineByPeriod.m1 || [];
+    const m1 = latestTradingDayRows(state.klineByPeriod.m1 || []);
     const m5 = state.klineByPeriod.m5 || [];
     const day = state.klineByPeriod.day || [];
     const m1Kdj = calculateKdj(m1).at(-1) || {};
@@ -2030,6 +2037,7 @@
     parseQuoteLine,
     fetchQuotes,
     recentTradeRows,
+    latestTradingDayRows,
     renderOrderBookHtml,
     renderIntradayInfoHtml,
     renderKlineInfo,
