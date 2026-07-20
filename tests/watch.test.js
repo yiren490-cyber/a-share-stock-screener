@@ -1,12 +1,16 @@
 const assert = require("assert");
+const fs = require("fs");
+const path = require("path");
 
 const watch = require("../assets/watch.js");
+const watchHtml = fs.readFileSync(path.join(__dirname, "..", "watch.html"), "utf8");
 
 assert.strictEqual(watch.normalizeSymbol("600519"), "sh600519");
 assert.strictEqual(watch.normalizeSymbol("000001"), "sz000001");
 assert.strictEqual(watch.normalizeSymbol("430047"), "bj430047");
 assert.strictEqual(watch.normalizeSymbol("SH600519"), "sh600519");
 assert.strictEqual(watch.normalizeSymbol(" bad "), "");
+assert(/<script src="assets\/watch\.js\?v=[^"]+"><\/script>/.test(watchHtml), "watch page should version watch.js so browsers do not keep stale intraday code");
 
 function quoteLine(symbol, name, code) {
   const fields = Array.from({ length: 50 }, () => "");
