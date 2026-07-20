@@ -206,6 +206,7 @@ assert(intradayLayout.volumeHeight >= 200, "intraday volume area should be tall 
 assert(intradayLayout.volumeTop < intradayLayout.priceBottom, "intraday volume can overlap the price area");
 assert.strictEqual(watch.intradaySlotMax([{ slot: 0 }, { slot: 60 }, { slot: 135 }]), 135);
 assert.strictEqual(watch.intradaySlotMax([]), 240);
+assert.strictEqual(watch.intradayAxisSlotMax(), 240);
 assert.deepStrictEqual(
   watch.intradayPriceValues([{ open: 10, high: 12, low: 8, close: 11 }], { prevClose: 9 }, 10.5),
   [10, 12, 8, 11, 9, 10.5],
@@ -221,6 +222,7 @@ const fakeSvg = {
 };
 const fakeInfo = { textContent: "", innerHTML: "", classList: { remove() {}, add() {} } };
 watch.drawIntradayChart(fakeSvg, [{ date: "2026-07-17 09:30", open: 10, high: 12, low: 8, close: 11, volume: 100 }], fakeInfo, { prevClose: 9 }, "", null);
+assert(fakeSvg.innerHTML.includes(">15:00</text>"), "intraday chart should keep the full-day 15:00 axis even when only early data exists");
 assert(fakeSvg.innerHTML.includes(`y="${intradayLayout.priceBottom - 2}" fill="#64748b" font-size="11" text-anchor="end">`), "intraday min label should sit at the bottom of the price scale");
 assert(!fakeSvg.innerHTML.includes(`y="${intradayLayout.volumeTop}" fill="#64748b" font-size="11" text-anchor="end">`), "intraday min label should not sit at the overlapped volume top");
 assert(!fakeSvg.innerHTML.includes(">量<"), "intraday chart should not show the volume label text");

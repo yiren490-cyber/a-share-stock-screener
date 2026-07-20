@@ -1449,6 +1449,10 @@
     return slots.length ? Math.max(1, ...slots) : 240;
   }
 
+  function intradayAxisSlotMax() {
+    return 240;
+  }
+
   function intradayPriceValues(rows, quote, average) {
     return (rows || [])
       .flatMap((row) => [row.open, row.high, row.low, row.close, quote && quote.prevClose, average])
@@ -1477,7 +1481,7 @@
     });
     const lastAverage = averageRows.length ? averageRows[averageRows.length - 1].value : null;
     const priceScale = chartScale(intradayPriceValues(plotted, quote, lastAverage), pad.top, priceBottom);
-    const slotMax = intradaySlotMax(plotted);
+    const slotMax = intradayAxisSlotMax();
     const maxVolume = Math.max(...rows.map((row) => row.volume || 0), 1);
     const barW = Math.max(2, (w - pad.left - pad.right) / slotMax - 1);
     const xForSlot = (slot) => pad.left + (Math.min(slot, slotMax) / slotMax) * (w - pad.left - pad.right);
@@ -2053,6 +2057,7 @@
     scaleDomain,
     intradayLayout,
     intradaySlotMax,
+    intradayAxisSlotMax,
     intradayPriceValues,
     drawIntradayChart,
     mergeAudioItems,
