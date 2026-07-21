@@ -5,6 +5,8 @@ const vm = require("vm");
 
 const appSource = fs.readFileSync(path.join(__dirname, "..", "assets", "app.js"), "utf8");
 const stylesSource = fs.readFileSync(path.join(__dirname, "..", "assets", "styles.css"), "utf8");
+const indexHtml = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
+assert(/<script src="assets\/app\.js\?v=[^"]+"><\/script>/.test(indexHtml), "screener page should version app.js so browsers do not keep stale chart code");
 
 function makeNode() {
   const node = {
@@ -221,9 +223,15 @@ assert(
   !renderSelectedChartsSource[0].includes("registerInitialHover"),
   "chart rerenders should not synchronously initialize all crosshairs and chart info; mouse movement can sync them on demand"
 );
+assert(
+  renderSelectedChartsSource[0].includes("resetChartInfoToLatest()"),
+  "chart rerenders should refresh chart info to the latest visible K-line"
+);
 
 assert(appSource.includes("function renderMainChartOnly()"), "main indicator changes should have a main-chart-only render path");
 assert(appSource.includes("function renderSubChartsOnly()"), "subchart indicator changes should have a subchart-only render path");
+assert(appSource.includes("function resetChartInfoToLatest()"), "chart info should have a latest-K reset helper");
+assert(/svg\.onmouseleave = \(\) => \{[\s\S]*?resetChartInfoToLatest\(\);[\s\S]*?\};/.test(appSource), "leaving a chart should restore latest K-line info");
 assert(
   /els\.mainIndicatorSelect\.addEventListener\("change", \(\) => \{[\s\S]*?renderMainChartOnly\(\);[\s\S]*?\}\);/.test(appSource),
   "main indicator changes should not rerender subcharts"

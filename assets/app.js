@@ -3075,7 +3075,7 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
       if (state.hoverIndex !== null) updateAllCrosshairs(state.hoverIndex, svg);
     };
     svg.onmouseleave = () => {
-      if (state.hoverIndex !== null) updateAllCrosshairs(state.hoverIndex, svg);
+      resetChartInfoToLatest();
     };
   }
 
@@ -3119,6 +3119,24 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
       floating.style.left = `${Math.max(8, left)}px`;
       floating.style.top = `${event.clientY + 12}px`;
     }
+  }
+
+  function resetChartInfoToLatest() {
+    let latestIndex = -1;
+    state.chartMetas.forEach((meta) => {
+      latestIndex = Math.max(latestIndex, meta.rows.length - 1);
+    });
+    if (latestIndex < 0) return;
+    state.hoverIndex = latestIndex;
+    state.chartMetas.forEach((meta, svg) => {
+      const row = meta.rows[latestIndex];
+      if (!row) return;
+      const layer = svg.querySelector(".crosshair-layer");
+      if (layer) layer.style.display = "none";
+      updateDataDisplay(svg, meta.info(row, latestIndex));
+    });
+    const floating = document.querySelector(".chart-tooltip");
+    if (floating) floating.style.display = "none";
   }
 
   function currentMainIndicator() {
@@ -3793,6 +3811,7 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
     }
     renderMainChart(state.selectedRows);
     renderSubCharts(state.selectedRows);
+    resetChartInfoToLatest();
   }
 
   function renderMainChartOnly() {
@@ -3801,6 +3820,7 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
       return;
     }
     renderMainChart(state.selectedRows);
+    resetChartInfoToLatest();
   }
 
   function renderSubChartsOnly() {
@@ -3814,6 +3834,7 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
     });
     subChartSvgs.forEach((svg) => state.chartMetas.delete(svg));
     renderSubCharts(state.selectedRows);
+    resetChartInfoToLatest();
   }
 
   async function selectQuote(symbol) {
