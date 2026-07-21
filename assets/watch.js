@@ -120,10 +120,8 @@
 
   function evaluateAlerts(data) {
     const kdj = data && data.minuteKdj ? data.minuteKdj : {};
-    const minuteKdj = ["k", "d", "j"].some((key) => {
-      const value = finiteNumber(kdj[key]);
-      return value !== null && value > 80;
-    });
+    const j = finiteNumber(kdj.j);
+    const minuteKdj = j !== null && j > 80;
     const fiveMinuteBoll = priceAboveUpper(data && data.fiveMinute);
     const dayBoll = priceAboveUpper(data && data.day);
     const count = [minuteKdj, fiveMinuteBoll, dayBoll].filter(Boolean).length;

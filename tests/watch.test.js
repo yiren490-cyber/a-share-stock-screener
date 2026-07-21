@@ -72,23 +72,23 @@ let alerts = watch.evaluateAlerts({
   previousCount: 1,
   minuteKdj: { k: 79, d: 80.1, j: 40 },
   fiveMinute: { price: 10.5, upper: 10.4 },
-  day: { price: 9.9, upper: 10 },
+  day: { price: 11, upper: 10 },
 });
 assert.deepStrictEqual(alerts, {
-  minuteKdj: true,
+  minuteKdj: false,
   fiveMinuteBoll: true,
-  dayBoll: false,
+  dayBoll: true,
   count: 2,
   shouldPlay: true,
 });
 
 alerts = watch.evaluateAlerts({
   previousCount: 2,
-  minuteKdj: { k: 90, d: 40, j: 40 },
+  minuteKdj: { k: 40, d: 40, j: 90 },
   fiveMinute: { price: 10.5, upper: 10.4 },
   day: { price: 11, upper: 10 },
 });
-assert.strictEqual(alerts.minuteKdj, true, "minute KDJ alert should use any K/D/J line above 80");
+assert.strictEqual(alerts.minuteKdj, true, "minute KDJ alert should use only the J line above 80");
 assert.strictEqual(alerts.count, 3);
 assert.strictEqual(alerts.shouldPlay, false, "sound should not repeat while already in alert state");
 
