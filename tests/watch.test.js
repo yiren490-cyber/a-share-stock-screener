@@ -59,8 +59,9 @@ assert.strictEqual(missingNav.previous, "");
 assert.strictEqual(missingNav.next, "");
 
 const defaults = watch.defaultPanelSettings();
-assert.deepStrictEqual(Object.keys(defaults), ["m1", "m5", "m30", "day"]);
+assert.deepStrictEqual(Object.keys(defaults), ["m1", "m5", "m30", "m60"]);
 assert.strictEqual(defaults.m1.mainMode, "ma");
+assert.strictEqual(defaults.m60.mainMode, "ma");
 assert.deepStrictEqual(defaults.m5.subcharts, ["volume", "macd", "kdj"]);
 
 const merged = watch.mergePanelSettings({

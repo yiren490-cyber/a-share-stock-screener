@@ -10,13 +10,15 @@
     "https://ifzq.gtimg.cn/appstock/app/fqkline/get",
   ];
   const TENCENT_MINUTE_KLINE_URL = "https://ifzq.gtimg.cn/appstock/app/kline/mkline";
-  const PERIODS = ["m1", "m5", "m30", "day"];
+  const PERIODS = ["m1", "m5", "m30", "m60"];
   const PERIOD_META = {
     m1: { label: "1分钟", klt: "1", bars: 120 },
     m5: { label: "5分钟", klt: "5", bars: 120 },
     m30: { label: "30分钟", klt: "30", bars: 120 },
+    m60: { label: "60分钟", klt: "60", bars: 120 },
     day: { label: "日K", klt: "day", bars: 120 },
   };
+  const ALERT_PERIODS = ["day"];
   const SUBCHARTS = ["volume", "macd", "kdj"];
   const SUBCHART_LABELS = { volume: "成交量", macd: "MACD", kdj: "KDJ" };
   const PANEL_STORAGE_KEY = "stockWatchPanelSettings";
@@ -1110,7 +1112,8 @@
     if (state.klineLoading) return;
     state.klineLoading = true;
     try {
-      const results = await Promise.allSettled(PERIODS.map(async (period) => [period, await fetchKline(state.symbol, period)]));
+      const periods = [...PERIODS, ...ALERT_PERIODS];
+      const results = await Promise.allSettled(periods.map(async (period) => [period, await fetchKline(state.symbol, period)]));
       results.forEach((result) => {
         if (result.status === "fulfilled") {
           const [period, rows] = result.value;
@@ -1188,7 +1191,7 @@
   }
 
   async function fetchTencentKline(symbol, period) {
-    if (period === "m1" || period === "m5" || period === "m30") return fetchTencentMinuteKline(symbol, period);
+    if (period === "m1" || period === "m5" || period === "m30" || period === "m60") return fetchTencentMinuteKline(symbol, period);
     return fetchTencentDayKline(symbol);
   }
 
