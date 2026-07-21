@@ -11,6 +11,11 @@ assert.strictEqual(watch.normalizeSymbol("430047"), "bj430047");
 assert.strictEqual(watch.normalizeSymbol("SH600519"), "sh600519");
 assert.strictEqual(watch.normalizeSymbol(" bad "), "");
 assert(/<script src="assets\/watch\.js\?v=[^"]+"><\/script>/.test(watchHtml), "watch page should version watch.js so browsers do not keep stale intraday code");
+assert.strictEqual(watch.readSoundEnabled({ getItem: (key) => (key === "stockWatchSoundEnabled" ? "1" : null) }), true);
+assert.strictEqual(watch.readSoundEnabled({ getItem: (key) => (key === "stockWatchSoundEnabled" ? "0" : null) }), false);
+const savedSound = {};
+watch.saveSoundEnabled({ setItem(key, value) { savedSound[key] = value; } }, true);
+assert.strictEqual(savedSound.stockWatchSoundEnabled, "1");
 
 function quoteLine(symbol, name, code) {
   const fields = Array.from({ length: 50 }, () => "");

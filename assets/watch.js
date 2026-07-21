@@ -28,6 +28,7 @@
   const SELECTED_BANNER_KEY = "stockWatchSelectedBanner";
   const QUOTE_NAME_CACHE_KEY = "stockWatchQuoteNames";
   const SELECTED_AUDIO_KEY = "stockWatchSelectedAudioId";
+  const SOUND_ENABLED_KEY = "stockWatchSoundEnabled";
   const STOCK_NOTES_KEY = "stockWatchNotes";
   const NOTE_TYPES = [
     { key: "watch", label: "盯盘笔记" },
@@ -185,6 +186,22 @@
     if (!latestRow) return [];
     const latestDate = latestRow.date.slice(0, 10);
     return rows.filter((row) => row && typeof row.date === "string" && row.date.slice(0, 10) === latestDate);
+  }
+
+  function readSoundEnabled(storage) {
+    try {
+      return storage && storage.getItem(SOUND_ENABLED_KEY) === "1";
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function saveSoundEnabled(storage, enabled) {
+    try {
+      if (storage) storage.setItem(SOUND_ENABLED_KEY, enabled ? "1" : "0");
+    } catch (_) {
+      // Storage can be unavailable in private contexts.
+    }
   }
 
   function normalizeSearchHistory(history, limit = 12) {
@@ -443,7 +460,7 @@
       searchHistory: readSearchHistory(root.localStorage),
       openCategories: new Set(),
       previousAlertCount: 0,
-      soundEnabled: false,
+      soundEnabled: readSoundEnabled(root.localStorage),
       uploadedAudioUrl: "",
       uploadedAudioObjectUrl: "",
       audioItems: [],
@@ -469,6 +486,7 @@
     renderSearchHistory(state, els);
     renderBannerList(state, els);
     renderAudioPicker(state, els);
+    renderSoundButton(state, els);
     bindWatchEvents(state, els);
     state.audioReadyPromise = loadStoredAudio(state, els);
     const lastSymbol = normalizeSymbol(root.localStorage.getItem(LAST_SYMBOL_KEY) || "");
@@ -1761,10 +1779,8 @@
   async function setSoundEnabled(state, els, enabled) {
     if (enabled && state.audioReadyPromise) await state.audioReadyPromise;
     state.soundEnabled = Boolean(enabled);
-    if (els.enableSoundButton) {
-      els.enableSoundButton.textContent = state.soundEnabled ? "关闭预警音频" : "启用预警音频";
-      els.enableSoundButton.classList.toggle("is-on", state.soundEnabled);
-    }
+    saveSoundEnabled(root.localStorage, state.soundEnabled);
+    renderSoundButton(state, els);
     if (!state.soundEnabled) {
       stopAlertLoop(state);
       updateAlertBanner(state, els);
@@ -1772,6 +1788,12 @@
     }
     if (state.previousAlertCount >= 2) startAlertLoop(state);
     updateAlertBanner(state, els);
+  }
+
+  function renderSoundButton(state, els) {
+    if (!els || !els.enableSoundButton) return;
+    els.enableSoundButton.textContent = state.soundEnabled ? "关闭预警音频" : "启用预警音频";
+    els.enableSoundButton.classList.toggle("is-on", state.soundEnabled);
   }
 
   function startAlertLoop(state) {
@@ -2043,6 +2065,8 @@
     renderOrderBookHtml,
     renderIntradayInfoHtml,
     renderKlineInfo,
+    readSoundEnabled,
+    saveSoundEnabled,
     normalizeSearchHistory,
     readSearchHistory,
     addSearchHistory,
