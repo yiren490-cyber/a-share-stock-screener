@@ -3,6 +3,8 @@ const fs = require("fs");
 const path = require("path");
 
 const watch = require("../assets/watch.js");
+const watchSource = fs.readFileSync(path.join(__dirname, "..", "assets", "watch.js"), "utf8");
+const stylesSource = fs.readFileSync(path.join(__dirname, "..", "assets", "styles.css"), "utf8");
 const watchHtml = fs.readFileSync(path.join(__dirname, "..", "watch.html"), "utf8");
 
 assert.strictEqual(watch.normalizeSymbol("600519"), "sh600519");
@@ -11,6 +13,14 @@ assert.strictEqual(watch.normalizeSymbol("430047"), "bj430047");
 assert.strictEqual(watch.normalizeSymbol("SH600519"), "sh600519");
 assert.strictEqual(watch.normalizeSymbol(" bad "), "");
 assert(/<script src="assets\/watch\.js\?v=[^"]+"><\/script>/.test(watchHtml), "watch page should version watch.js so browsers do not keep stale intraday code");
+assert(watchSource.includes("function renderNotesPreview"), "notes hover preview should exist");
+assert(watchSource.includes("function renderNotesEditor"), "notes click editor should exist");
+assert(/data-note-type-select/.test(watchSource), "notes editor should have a category selector");
+assert(/activeNoteType:\s*"watch"/.test(watchSource), "notes editor should default to realtime watch notes");
+assert(watchSource.includes('NOTE_EDITOR_LABELS = { watch: "实时盯盘", trend: "K线趋势分析", news: "行情分析" }'), "notes editor selector should use the requested labels");
+assert(/function enableNotesDialogDrag/.test(watchSource), "notes editor dialog should be draggable");
+assert(/\.watch-notes-dialog\s*\{[^}]*resize:\s*both;/s.test(stylesSource), "notes editor dialog should be resizable from the corner");
+assert(/\.watch-notes-popover\s*\{[\s\S]*?grid-template-columns:\s*repeat\(3, minmax\(0, 1fr\)\)/.test(stylesSource), "notes hover preview should stay in three columns");
 assert.strictEqual(watch.readSoundEnabled({ getItem: (key) => (key === "stockWatchSoundEnabled" ? "1" : null) }), true);
 assert.strictEqual(watch.readSoundEnabled({ getItem: (key) => (key === "stockWatchSoundEnabled" ? "0" : null) }), false);
 const savedSound = {};

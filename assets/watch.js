@@ -37,6 +37,7 @@
     { key: "trend", label: "K线趋势分析" },
     { key: "news", label: "消息面行情分析" },
   ];
+  const NOTE_EDITOR_LABELS = { watch: "实时盯盘", trend: "K线趋势分析", news: "行情分析" };
   const QUOTE_REFRESH_MS = 500;
   const KLINE_REFRESH_MS = 1500;
   const AUDIO_DB = "stockWatchAudio";
@@ -474,6 +475,7 @@
       bannerItems: readBannerItems(root.localStorage),
       selectedBannerId: root.localStorage.getItem(SELECTED_BANNER_KEY) || "",
       notesBySymbol: readStockNotes(root.localStorage),
+      activeNoteType: "watch",
       quoteLoading: false,
       klineLoading: false,
       lastStatusAt: 0,
@@ -509,6 +511,7 @@
       notesButton: doc.getElementById("watchNotesButton"),
       notesPreview: doc.getElementById("watchNotesPreview"),
       notesModal: doc.getElementById("watchNotesModal"),
+      notesDialog: doc.querySelector(".watch-notes-dialog"),
       notesCloseButton: doc.getElementById("watchNotesCloseButton"),
       notesEditor: doc.getElementById("watchNotesEditor"),
       stockMeta: doc.getElementById("watchStockMeta"),
@@ -579,6 +582,7 @@
     els.notesModal.addEventListener("click", (event) => {
       if (event.target === els.notesModal) closeNotesModal(els);
     });
+    enableNotesDialogDrag(els);
     els.zoomInButton.addEventListener("click", () => setVisibleBars(state, els, adjustVisibleBars(state.visibleBars, "in")));
     els.zoomOutButton.addEventListener("click", () => setVisibleBars(state, els, adjustVisibleBars(state.visibleBars, "out")));
     els.zoomResetButton.addEventListener("click", () => setVisibleBars(state, els, 120));
@@ -891,14 +895,33 @@
 
   function renderNotesEditor(state, els) {
     const groups = notesForSymbol(state);
-    els.notesEditor.innerHTML = NOTE_TYPES.map(
-      ({ key, label }) => `<section class="watch-note-column" data-note-type="${key}">
-        <h3>${label}</h3>
-        <textarea rows="3" data-note-input="${key}"></textarea>
-        <button type="button" data-note-add="${key}">添加笔记</button>
-        ${renderNoteItems(groups[key], Infinity, true)}
-      </section>`
-    ).join("");
+    const selectedType = NOTE_TYPES.some((item) => item.key === state.activeNoteType) ? state.activeNoteType : "watch";
+    state.activeNoteType = selectedType;
+    const selectedLabel = NOTE_EDITOR_LABELS[selectedType] || NOTE_TYPES.find((item) => item.key === selectedType).label;
+    els.notesEditor.innerHTML = `<section class="watch-notes-single" data-note-type="${selectedType}">
+      <label class="watch-note-type-field">
+        <span>笔记分类</span>
+        <select data-note-type-select>
+          ${NOTE_TYPES.map(({ key, label }) => `<option value="${key}" ${key === selectedType ? "selected" : ""}>${NOTE_EDITOR_LABELS[key] || label}</option>`).join("")}
+        </select>
+      </label>
+      <div class="watch-note-new">
+        <h3>新笔记</h3>
+        <textarea rows="4" data-note-input="${selectedType}"></textarea>
+        <button type="button" data-note-add="${selectedType}">添加笔记</button>
+      </div>
+      <section class="watch-note-list-panel">
+        <h3>${selectedLabel}</h3>
+        ${renderNoteItems(groups[selectedType], Infinity, true)}
+      </section>
+    </section>`;
+    const typeSelect = els.notesEditor.querySelector("[data-note-type-select]");
+    if (typeSelect) {
+      typeSelect.addEventListener("change", () => {
+        state.activeNoteType = typeSelect.value;
+        renderNotesEditor(state, els);
+      });
+    }
     els.notesEditor.querySelectorAll("[data-note-add]").forEach((button) => {
       button.addEventListener("click", () => {
         const type = button.dataset.noteAdd;
@@ -942,10 +965,49 @@
     hideNotesPreview(els);
     renderNotesEditor(state, els);
     els.notesModal.hidden = false;
+    centerNotesDialog(els);
   }
 
   function closeNotesModal(els) {
     if (els.notesModal) els.notesModal.hidden = true;
+  }
+
+  function centerNotesDialog(els) {
+    const dialog = els.notesDialog;
+    if (!dialog || dialog.dataset.moved === "true") return;
+    dialog.style.left = "50%";
+    dialog.style.top = "50%";
+    dialog.style.transform = "translate(-50%, -50%)";
+  }
+
+  function enableNotesDialogDrag(els) {
+    const dialog = els.notesDialog;
+    const handle = dialog && dialog.querySelector(".watch-notes-dialog-head");
+    if (!dialog || !handle) return;
+    handle.addEventListener("mousedown", (event) => {
+      if (event.target.closest("button")) return;
+      const rect = dialog.getBoundingClientRect();
+      const startX = event.clientX;
+      const startY = event.clientY;
+      const startLeft = rect.left;
+      const startTop = rect.top;
+      dialog.dataset.moved = "true";
+      dialog.style.transform = "none";
+      dialog.style.left = `${startLeft}px`;
+      dialog.style.top = `${startTop}px`;
+      const onMove = (moveEvent) => {
+        const nextLeft = Math.max(8, Math.min(window.innerWidth - 80, startLeft + moveEvent.clientX - startX));
+        const nextTop = Math.max(8, Math.min(window.innerHeight - 48, startTop + moveEvent.clientY - startY));
+        dialog.style.left = `${nextLeft}px`;
+        dialog.style.top = `${nextTop}px`;
+      };
+      const onUp = () => {
+        window.removeEventListener("mousemove", onMove);
+        window.removeEventListener("mouseup", onUp);
+      };
+      window.addEventListener("mousemove", onMove);
+      window.addEventListener("mouseup", onUp);
+    });
   }
 
   function loadFromInput(state, els) {
