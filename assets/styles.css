@@ -1665,8 +1665,8 @@ svg {
 
 .watch-notes-dialog {
   position: absolute;
-  width: min(680px, 92vw);
-  min-width: 360px;
+  width: min(320px, 92vw);
+  min-width: 320px;
   min-height: 420px;
   max-height: 86vh;
   overflow: auto;
