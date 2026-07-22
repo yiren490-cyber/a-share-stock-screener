@@ -1600,18 +1600,19 @@
       const points = items.map((item) => `${xForSlot(item.slot).toFixed(2)},${priceScale.y(item.value).toFixed(2)}`);
       return points.length ? `M ${points.join(" L ")}` : "";
     };
-    const segmentLines = (states, colorKey) =>
+    const segmentLines = (states, colorKey, halo = false) =>
       states
         .map((state, index) => {
           if (index === 0 || state.color !== colorKey) return "";
           const previous = plotted[index - 1];
           const current = plotted[index];
           if (!previous || !current) return "";
-          return `<path d="M ${xForSlot(previous.slot).toFixed(2)},${priceScale.y(previous.close).toFixed(2)} L ${xForSlot(current.slot).toFixed(2)},${priceScale.y(current.close).toFixed(2)}" fill="none" stroke="${colorKey === "yellow" ? "#facc15" : colorKey === "blue" ? "#1e40af" : "#dc2626"}" stroke-width="2.3" />`;
+          return `<path ${halo ? 'class="watch-price-halo" ' : ""}d="M ${xForSlot(previous.slot).toFixed(2)},${priceScale.y(previous.close).toFixed(2)} L ${xForSlot(current.slot).toFixed(2)},${priceScale.y(current.close).toFixed(2)}" fill="none" stroke="${halo ? "#ffffff" : colorKey === "yellow" ? "#facc15" : colorKey === "blue" ? "#1e40af" : "#dc2626"}" stroke-width="${halo ? "5" : "2.4"}" stroke-linecap="round" stroke-linejoin="round" opacity="${halo ? "0.9" : "1"}" />`;
         })
         .join("");
     const trendStates = calculateIntradayTrendStates(plotted);
     const priceLine = sessionLine(plotted.map((row) => ({ slot: row.slot, value: row.close })));
+    const coloredPriceHalos = `${segmentLines(trendStates, "yellow", true)}${segmentLines(trendStates, "blue", true)}${segmentLines(trendStates, "red", true)}`;
     const coloredPriceLines = `${segmentLines(trendStates, "yellow")}${segmentLines(trendStates, "blue")}${segmentLines(trendStates, "red")}`;
     const averageLine = sessionLine(averageRows);
     const volumeBars = plotted
@@ -1662,10 +1663,12 @@
       <line x1="${pad.left}" y1="${h - pad.bottom}" x2="${w - pad.right}" y2="${h - pad.bottom}" stroke="#dfe5ec" />
       ${prevY ? `<line x1="${pad.left}" y1="${prevY}" x2="${w - pad.right}" y2="${prevY}" stroke="#dc2626" stroke-dasharray="4 4" />
       <text x="${pad.left - 4}" y="${prevY + 4}" fill="#dc2626" font-size="11" text-anchor="end">${formatNumber(quote.prevClose)}</text>` : ""}
-      <path d="${priceLine}" fill="none" stroke="#111827" stroke-width="1.8" />
+      ${volumeBars}
+      <path class="watch-price-halo" d="${priceLine}" fill="none" stroke="#ffffff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" opacity="0.9" />
+      ${coloredPriceHalos}
+      <path d="${priceLine}" fill="none" stroke="#111827" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
       ${coloredPriceLines}
       <path d="${averageLine}" fill="none" stroke="#f59e0b" stroke-width="1.3" />
-      ${volumeBars}
       ${crosshair}
       <text x="${pad.left - 4}" y="${pad.top + 10}" fill="#64748b" font-size="11" text-anchor="end">${priceScale.max.toFixed(2)}</text>
       <text x="${pad.left - 4}" y="${priceBottom - 2}" fill="#64748b" font-size="11" text-anchor="end">${priceScale.min.toFixed(2)}</text>
