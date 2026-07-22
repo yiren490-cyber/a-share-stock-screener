@@ -126,11 +126,13 @@
     const kdj = data && data.minuteKdj ? data.minuteKdj : {};
     const j = finiteNumber(kdj.j);
     const minuteKdj = j !== null && j > 80;
+    const intradayBlue = data && data.intradayTrend && data.intradayTrend.color === "blue";
     const fiveMinuteBoll = priceAboveUpper(data && data.fiveMinute);
     const dayBoll = priceAboveUpper(data && data.day);
-    const count = [minuteKdj, fiveMinuteBoll, dayBoll].filter(Boolean).length;
+    const count = [minuteKdj, intradayBlue, fiveMinuteBoll, dayBoll].filter(Boolean).length;
     return {
       minuteKdj,
+      intradayBlue,
       fiveMinuteBoll,
       dayBoll,
       count,
@@ -443,6 +445,34 @@
     const kValues = sma(rsv, 3, 1);
     const dValues = sma(kValues, 3, 1);
     return rows.map((_, index) => ({ k: kValues[index], d: dValues[index], j: 3 * kValues[index] - 2 * dValues[index] }));
+  }
+
+  function intradayPriceLineColor({ trend, previousTrend }) {
+    const current = finiteNumber(trend);
+    const previous = finiteNumber(previousTrend);
+    const v12 = current !== null && previous !== null && previous !== 0 ? ((current - previous) / previous) * 100 : 0;
+    if (current !== null && current <= 13 && v12 > 13) return "red";
+    if (current !== null && current >= 90 && v12 !== 0) return "blue";
+    if (current !== null && current <= 13) return "yellow";
+    return "black";
+  }
+
+  function calculateIntradayTrendStates(rows) {
+    const base = (rows || []).map((row, index) => {
+      const windowRows = rows.slice(Math.max(0, index - 54), index + 1);
+      const low = Math.min(...windowRows.map((item) => item.low));
+      const high = Math.max(...windowRows.map((item) => item.high));
+      return high === low ? 50 : ((row.close - low) / (high - low)) * 100;
+    });
+    const fast = sma(base, 5, 1);
+    const slow = sma(fast, 3, 1);
+    const v11 = fast.map((value, index) => 3 * value - 2 * slow[index]);
+    const trend = ema(v11, 3);
+    return trend.map((value, index) => ({
+      trend: value,
+      previousTrend: index > 0 ? trend[index - 1] : value,
+      color: intradayPriceLineColor({ trend: value, previousTrend: index > 0 ? trend[index - 1] : value }),
+    }));
   }
 
   function initWatchPage(doc) {
@@ -1570,7 +1600,19 @@
       const points = items.map((item) => `${xForSlot(item.slot).toFixed(2)},${priceScale.y(item.value).toFixed(2)}`);
       return points.length ? `M ${points.join(" L ")}` : "";
     };
+    const segmentLines = (states, colorKey) =>
+      states
+        .map((state, index) => {
+          if (index === 0 || state.color !== colorKey) return "";
+          const previous = plotted[index - 1];
+          const current = plotted[index];
+          if (!previous || !current) return "";
+          return `<path d="M ${xForSlot(previous.slot).toFixed(2)},${priceScale.y(previous.close).toFixed(2)} L ${xForSlot(current.slot).toFixed(2)},${priceScale.y(current.close).toFixed(2)}" fill="none" stroke="${colorKey === "yellow" ? "#facc15" : colorKey === "blue" ? "#1e40af" : "#dc2626"}" stroke-width="2.3" />`;
+        })
+        .join("");
+    const trendStates = calculateIntradayTrendStates(plotted);
     const priceLine = sessionLine(plotted.map((row) => ({ slot: row.slot, value: row.close })));
+    const coloredPriceLines = `${segmentLines(trendStates, "yellow")}${segmentLines(trendStates, "blue")}${segmentLines(trendStates, "red")}`;
     const averageLine = sessionLine(averageRows);
     const volumeBars = plotted
       .map((row, index) => {
@@ -1620,7 +1662,8 @@
       <line x1="${pad.left}" y1="${h - pad.bottom}" x2="${w - pad.right}" y2="${h - pad.bottom}" stroke="#dfe5ec" />
       ${prevY ? `<line x1="${pad.left}" y1="${prevY}" x2="${w - pad.right}" y2="${prevY}" stroke="#dc2626" stroke-dasharray="4 4" />
       <text x="${pad.left - 4}" y="${prevY + 4}" fill="#dc2626" font-size="11" text-anchor="end">${formatNumber(quote.prevClose)}</text>` : ""}
-      <path d="${priceLine}" fill="none" stroke="#1d4ed8" stroke-width="1.8" />
+      <path d="${priceLine}" fill="none" stroke="#111827" stroke-width="1.8" />
+      ${coloredPriceLines}
       <path d="${averageLine}" fill="none" stroke="#f59e0b" stroke-width="1.3" />
       ${volumeBars}
       ${crosshair}
@@ -1819,16 +1862,18 @@
     const m5 = state.klineByPeriod.m5 || [];
     const day = state.klineByPeriod.day || [];
     const m1Kdj = calculateKdj(m1).at(-1) || {};
+    const intradayTrend = calculateIntradayTrendStates(m1).at(-1) || {};
     const m5Boll = calculateBoll(m5).at(-1) || {};
     const dayBoll = calculateBoll(day).at(-1) || {};
     const realtimePrice = state.quote && state.quote.latestPrice;
     const result = evaluateAlerts({
       previousCount: state.previousAlertCount,
       minuteKdj: m1Kdj,
+      intradayTrend,
       fiveMinute: { price: realtimePrice || (m5.at(-1) && m5.at(-1).close), upper: m5Boll.ub },
       day: { price: realtimePrice || (day.at(-1) && day.at(-1).close), upper: dayBoll.ub },
     });
-    Object.entries({ minuteKdj: result.minuteKdj, fiveMinuteBoll: result.fiveMinuteBoll, dayBoll: result.dayBoll }).forEach(([key, active]) => {
+    Object.entries({ minuteKdj: result.minuteKdj, intradayBlue: result.intradayBlue, fiveMinuteBoll: result.fiveMinuteBoll, dayBoll: result.dayBoll }).forEach(([key, active]) => {
       const node = els.alertLights.querySelector(`[data-alert="${key}"]`);
       if (node) node.classList.toggle("is-on", active);
     });
@@ -2146,6 +2191,8 @@
     intradaySlotMax,
     intradayAxisSlotMax,
     intradayPriceValues,
+    intradayPriceLineColor,
+    calculateIntradayTrendStates,
     drawIntradayChart,
     mergeAudioItems,
     hasStoredAlertAudio,

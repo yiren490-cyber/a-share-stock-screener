@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>A股实时盯盘</title>
     <link rel="icon" href="data:," />
-    <link rel="stylesheet" href="assets/styles.css?v=20260722-notes-narrow" />
+    <link rel="stylesheet" href="assets/styles.css?v=20260722-intraday-color" />
   </head>
   <body class="watch-page">
     <main class="watch-shell">
@@ -27,6 +27,7 @@
         </div>
         <div class="watch-alerts" id="alertLights" aria-label="预警灯">
           <div class="watch-alert-light" data-alert="minuteKdj"><span></span><strong>1分钟 KDJ&gt;80</strong></div>
+          <div class="watch-alert-light" data-alert="intradayBlue"><span></span><strong>分时 深蓝</strong></div>
           <div class="watch-alert-light" data-alert="fiveMinuteBoll"><span></span><strong>5分钟 突破BOLL</strong></div>
           <div class="watch-alert-light" data-alert="dayBoll"><span></span><strong>日K 突破BOLL</strong></div>
         </div>
@@ -108,7 +109,7 @@
     </main>
 
     <script src="assets/listing-dates.js"></script>
-    <script src="assets/watch.js?v=20260722-notes-narrow"></script>
+    <script src="assets/watch.js?v=20260722-intraday-color"></script>
     <script>
       window.stockWatch.initWatchPage(document);
     </script>
