@@ -398,6 +398,50 @@
     });
   }
 
+  function quoteDate(quote) {
+    const match = String((quote && quote.rawTime) || "").match(/^(\d{4}-\d{2}-\d{2})/);
+    return match ? match[1] : "";
+  }
+
+  function completedDailyRows(rows, quote) {
+    const normalized = (rows || [])
+      .map((row) => {
+        const close = finiteNumber(row && row.close);
+        return row && row.date && close !== null ? { ...row, close } : null;
+      })
+      .filter(Boolean);
+    const currentDate = quoteDate(quote);
+    if (!currentDate || !normalized.length) return normalized;
+    const latest = normalized[normalized.length - 1];
+    return String(latest.date).slice(0, 10) === currentDate ? normalized.slice(0, -1) : normalized;
+  }
+
+  function latestMovingAverage(rows, period) {
+    const values = movingAverage(rows, period, "close");
+    return values.length ? values[values.length - 1] : null;
+  }
+
+  function calculateStopWarningLevels(dayRows, quote) {
+    const rows = completedDailyRows(dayRows, quote);
+    const price = finiteNumber(quote && quote.latestPrice);
+    const previous1 = rows[rows.length - 1];
+    const previous2 = rows[rows.length - 2];
+    const warningPrice = previous1 && previous2 ? Math.min(previous1.close, previous2.close) : null;
+    const ma5 = rows.length >= 5 ? latestMovingAverage(rows, 5) : null;
+    const ma10 = rows.length >= 10 ? latestMovingAverage(rows, 10) : null;
+    const ma17 = rows.length >= 17 ? latestMovingAverage(rows, 17) : null;
+    return {
+      warningPrice,
+      ma5,
+      ma10,
+      ma17,
+      warningPriceActive: price !== null && warningPrice !== null && price < warningPrice,
+      ma5Active: price !== null && ma5 !== null && price < ma5,
+      ma10Active: price !== null && ma10 !== null && price < ma10,
+      ma17Active: price !== null && ma17 !== null && price < ma17,
+    };
+  }
+
   function calculateBoll(rows, period = 20) {
     const mid = movingAverage(rows, period, "close");
     return rows.map((row, index) => {
@@ -1188,6 +1232,7 @@
         saveQuoteNameCache(root.localStorage, state.quoteNameCache);
       }
       renderQuote(state, els);
+      updateStopAlertLights(els, calculateStopWarningLevels(state.klineByPeriod.day || [], state.quote));
       if (state.quote && state.quote.name && state.quote.name !== previousName) renderCategories(state, els);
       const now = Date.now();
       if (now - state.lastStatusAt > 5000) {
@@ -1881,6 +1926,7 @@
       const node = els.alertLights.querySelector(`[data-alert="${key}"]`);
       if (node) node.classList.toggle("is-on", active);
     });
+    updateStopAlertLights(els, calculateStopWarningLevels(day, state.quote));
     if (result.count >= 2) {
       startAlertLoop(state);
     } else {
@@ -1888,6 +1934,22 @@
     }
     state.previousAlertCount = result.count;
     updateAlertBanner(state, els);
+  }
+
+  function updateStopAlertLights(els, levels) {
+    const items = [
+      ["warningPrice", "预警价格", levels.warningPrice, levels.warningPriceActive],
+      ["ma5", "5日均价", levels.ma5, levels.ma5Active],
+      ["ma10", "10日均价", levels.ma10, levels.ma10Active],
+      ["ma17", "17日均价", levels.ma17, levels.ma17Active],
+    ];
+    items.forEach(([key, label, value, active]) => {
+      const node = els.alertLights && els.alertLights.querySelector(`[data-stop-alert="${key}"]`);
+      if (!node) return;
+      node.classList.toggle("is-on", Boolean(active));
+      const text = node.querySelector("strong");
+      if (text) text.textContent = `${label}：${formatNumber(value)}`;
+    });
   }
 
   async function setSoundEnabled(state, els, enabled) {
@@ -2166,6 +2228,7 @@
     defaultPanelSettings,
     mergePanelSettings,
     evaluateAlerts,
+    calculateStopWarningLevels,
     tradingSessionTicks,
     minuteToTradingSlot,
     slotToTradingTime,

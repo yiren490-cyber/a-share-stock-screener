@@ -1223,7 +1223,7 @@ svg {
 
 .watch-topbar {
   display: grid;
-  grid-template-columns: minmax(220px, 1fr) minmax(520px, 2fr) minmax(340px, 0.9fr);
+  grid-template-columns: minmax(190px, 0.9fr) minmax(470px, 1.6fr) minmax(430px, 1.2fr);
   gap: 12px;
   align-items: center;
   padding: 14px;
@@ -1332,6 +1332,12 @@ svg {
 
 .watch-alerts {
   display: grid;
+  grid-template-columns: minmax(126px, 0.82fr) minmax(150px, 1fr);
+  gap: 7px;
+}
+
+.watch-alert-group {
+  display: grid;
   gap: 7px;
 }
 
@@ -1364,6 +1370,16 @@ svg {
 .watch-alert-light.is-on span {
   background: #dc2626;
   box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.14), 0 0 14px rgba(220, 38, 38, 0.45);
+}
+
+.watch-alert-light.is-stop.is-on {
+  border-color: #bbf7d0;
+  background: #f0fdf4;
+}
+
+.watch-alert-light.is-stop.is-on span {
+  background: #16a34a;
+  box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.14), 0 0 14px rgba(22, 163, 74, 0.42);
 }
 
 .watch-audio-bar {

@@ -120,6 +120,62 @@ assert.strictEqual(alerts.intradayBlue, true, "intraday blue alert should light 
 assert.strictEqual(alerts.count, 4);
 assert.strictEqual(alerts.shouldPlay, false, "sound should not repeat while already in alert state");
 
+const stopLevels = watch.calculateStopWarningLevels(
+  [
+    { date: "2026-07-20", close: 11 },
+    { date: "2026-07-21", close: 12 },
+    { date: "2026-07-22", close: 10 },
+    { date: "2026-07-23", close: 15 },
+  ],
+  { latestPrice: 9.5, rawTime: "2026-07-23 10:30" }
+);
+assert.deepStrictEqual(stopLevels, {
+  warningPrice: 10,
+  ma5: null,
+  ma10: null,
+  ma17: null,
+  warningPriceActive: true,
+  ma5Active: false,
+  ma10Active: false,
+  ma17Active: false,
+});
+
+const maStopLevels = watch.calculateStopWarningLevels(
+  [
+    { date: "2026-07-01", close: 20 },
+    { date: "2026-07-02", close: 19 },
+    { date: "2026-07-03", close: 18 },
+    { date: "2026-07-06", close: 17 },
+    { date: "2026-07-07", close: 16 },
+    { date: "2026-07-08", close: 15 },
+    { date: "2026-07-09", close: 14 },
+    { date: "2026-07-10", close: 13 },
+    { date: "2026-07-13", close: 12 },
+    { date: "2026-07-14", close: 11 },
+    { date: "2026-07-15", close: 10 },
+    { date: "2026-07-16", close: 9 },
+    { date: "2026-07-17", close: 8 },
+    { date: "2026-07-20", close: 7 },
+    { date: "2026-07-21", close: 6 },
+    { date: "2026-07-22", close: 5 },
+    { date: "2026-07-23", close: 4 },
+    { date: "2026-07-24", close: 3 },
+  ],
+  { latestPrice: 8.2, rawTime: "2026-07-24 11:00" }
+);
+assert.strictEqual(maStopLevels.warningPrice, 4);
+assert.strictEqual(maStopLevels.ma5, 6);
+assert.strictEqual(maStopLevels.ma10, 8.5);
+assert.strictEqual(maStopLevels.ma17, 12);
+assert.strictEqual(maStopLevels.warningPriceActive, false);
+assert.strictEqual(maStopLevels.ma5Active, false);
+assert.strictEqual(maStopLevels.ma10Active, true);
+assert.strictEqual(maStopLevels.ma17Active, true);
+assert(watchHtml.includes('data-stop-alert="warningPrice"'), "watch page should show BOLL short stop warning price light");
+assert(watchHtml.includes('data-stop-alert="ma5"'), "watch page should show MA5 stop light");
+assert(watchHtml.includes('data-stop-alert="ma10"'), "watch page should show MA10 stop light");
+assert(watchHtml.includes('data-stop-alert="ma17"'), "watch page should show MA17 stop light");
+
 assert.deepStrictEqual(watch.tradingSessionTicks(), [
   { label: "9:30", minute: 570 },
   { label: "10:30", minute: 630 },

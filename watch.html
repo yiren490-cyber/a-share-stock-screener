@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>A股实时盯盘</title>
     <link rel="icon" href="data:," />
-    <link rel="stylesheet" href="assets/styles.css?v=20260722-intraday-color" />
+    <link rel="stylesheet" href="assets/styles.css?v=20260723-stop-alerts" />
   </head>
   <body class="watch-page">
     <main class="watch-shell">
@@ -26,10 +26,18 @@
           <a class="watch-link-button" href="index.html">返回筛选器</a>
         </div>
         <div class="watch-alerts" id="alertLights" aria-label="预警灯">
-          <div class="watch-alert-light" data-alert="minuteKdj"><span></span><strong>1分钟 KDJ&gt;80</strong></div>
-          <div class="watch-alert-light" data-alert="intradayBlue"><span></span><strong>分时 深蓝</strong></div>
-          <div class="watch-alert-light" data-alert="fiveMinuteBoll"><span></span><strong>5分钟 突破BOLL</strong></div>
-          <div class="watch-alert-light" data-alert="dayBoll"><span></span><strong>日K 突破BOLL</strong></div>
+          <div class="watch-alert-group">
+            <div class="watch-alert-light" data-alert="minuteKdj"><span></span><strong>1分钟 KDJ&gt;80</strong></div>
+            <div class="watch-alert-light" data-alert="intradayBlue"><span></span><strong>分时 深蓝</strong></div>
+            <div class="watch-alert-light" data-alert="fiveMinuteBoll"><span></span><strong>5分钟 突破BOLL</strong></div>
+            <div class="watch-alert-light" data-alert="dayBoll"><span></span><strong>日K 突破BOLL</strong></div>
+          </div>
+          <div class="watch-alert-group">
+            <div class="watch-alert-light is-stop" data-stop-alert="warningPrice"><span></span><strong>预警价格：--</strong></div>
+            <div class="watch-alert-light is-stop" data-stop-alert="ma5"><span></span><strong>5日均价：--</strong></div>
+            <div class="watch-alert-light is-stop" data-stop-alert="ma10"><span></span><strong>10日均价：--</strong></div>
+            <div class="watch-alert-light is-stop" data-stop-alert="ma17"><span></span><strong>17日均价：--</strong></div>
+          </div>
         </div>
       </section>
 
@@ -109,7 +117,7 @@
     </main>
 
     <script src="assets/listing-dates.js"></script>
-    <script src="assets/watch.js?v=20260723-notes-left"></script>
+    <script src="assets/watch.js?v=20260723-stop-alerts2"></script>
     <script>
       window.stockWatch.initWatchPage(document);
     </script>
