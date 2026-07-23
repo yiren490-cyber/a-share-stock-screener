@@ -4,9 +4,11 @@ const path = require("path");
 const vm = require("vm");
 
 const appSource = fs.readFileSync(path.join(__dirname, "..", "assets", "app.js"), "utf8");
+const listingDatesSource = fs.readFileSync(path.join(__dirname, "..", "assets", "listing-dates.js"), "utf8");
 const stylesSource = fs.readFileSync(path.join(__dirname, "..", "assets", "styles.css"), "utf8");
 const indexHtml = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
 assert(/<script src="assets\/app\.js\?v=[^"]+"><\/script>/.test(indexHtml), "screener page should version app.js so browsers do not keep stale chart code");
+assert(/<script src="assets\/listing-dates\.js\?v=[^"]+"><\/script>/.test(indexHtml), "screener page should version listing-dates.js so browsers do not keep stale listing dates");
 
 function makeNode() {
   const node = {
@@ -236,5 +238,9 @@ assert(
   /els\.mainIndicatorSelect\.addEventListener\("change", \(\) => \{[\s\S]*?renderMainChartOnly\(\);[\s\S]*?\}\);/.test(appSource),
   "main indicator changes should not rerender subcharts"
 );
+
+["bj920222", "sz301234", "sh688618", "sz301158", "bj920193"].forEach((symbol) => {
+  assert(listingDatesSource.includes(`"${symbol}"`), `static listing dates should include ${symbol}`);
+});
 
 console.log("indicator-screening tests passed");
