@@ -25,6 +25,10 @@ assert(/\.watch-notes-dialog\s*\{[^}]*resize:\s*both;/s.test(stylesSource), "not
 assert(/\.watch-notes-dialog\s*\{[^}]*width:\s*min\(300px, 92vw\);/s.test(stylesSource), "notes editor dialog should open at a narrower default width");
 assert(/\.watch-notes-dialog\s*\{[^}]*min-width:\s*300px;/s.test(stylesSource), "notes editor dialog minimum width should be 300px");
 assert(/\.watch-notes-popover\s*\{[\s\S]*?grid-template-columns:\s*repeat\(3, minmax\(0, 1fr\)\)/.test(stylesSource), "notes hover preview should stay in three columns");
+const noteDialog = { dataset: { moved: "true" }, style: {} };
+watch.positionNotesDialogAtPageLeft({ notesDialog: noteDialog });
+assert.deepStrictEqual(noteDialog.style, { left: "8px", top: "50%", transform: "translateY(-50%)" });
+assert.strictEqual(noteDialog.dataset.moved, "false");
 assert.strictEqual(watch.readSoundEnabled({ getItem: (key) => (key === "stockWatchSoundEnabled" ? "1" : null) }), true);
 assert.strictEqual(watch.readSoundEnabled({ getItem: (key) => (key === "stockWatchSoundEnabled" ? "0" : null) }), false);
 const savedSound = {};

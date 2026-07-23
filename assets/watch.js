@@ -995,19 +995,20 @@
     hideNotesPreview(els);
     renderNotesEditor(state, els);
     els.notesModal.hidden = false;
-    centerNotesDialog(els);
+    positionNotesDialogAtPageLeft(els);
   }
 
   function closeNotesModal(els) {
     if (els.notesModal) els.notesModal.hidden = true;
   }
 
-  function centerNotesDialog(els) {
+  function positionNotesDialogAtPageLeft(els) {
     const dialog = els.notesDialog;
-    if (!dialog || dialog.dataset.moved === "true") return;
-    dialog.style.left = "50%";
+    if (!dialog) return;
+    dialog.dataset.moved = "false";
+    dialog.style.left = "8px";
     dialog.style.top = "50%";
-    dialog.style.transform = "translate(-50%, -50%)";
+    dialog.style.transform = "translateY(-50%)";
   }
 
   function enableNotesDialogDrag(els) {
@@ -2197,6 +2198,7 @@
     intradayPriceLineColor,
     calculateIntradayTrendStates,
     drawIntradayChart,
+    positionNotesDialogAtPageLeft,
     mergeAudioItems,
     hasStoredAlertAudio,
     deleteAudioFromDb,
