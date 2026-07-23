@@ -421,15 +421,24 @@
     return values.length ? values[values.length - 1] : null;
   }
 
+  function realtimeDailyRows(rows, quote) {
+    const completed = completedDailyRows(rows, quote);
+    const price = finiteNumber(quote && quote.latestPrice);
+    if (price === null) return completed;
+    const currentDate = quoteDate(quote);
+    return [...completed, { date: currentDate || "", close: price }];
+  }
+
   function calculateStopWarningLevels(dayRows, quote) {
     const rows = completedDailyRows(dayRows, quote);
+    const maRows = realtimeDailyRows(dayRows, quote);
     const price = finiteNumber(quote && quote.latestPrice);
     const previous1 = rows[rows.length - 1];
     const previous2 = rows[rows.length - 2];
     const warningPrice = previous1 && previous2 ? Math.min(previous1.close, previous2.close) : null;
-    const ma5 = rows.length >= 5 ? latestMovingAverage(rows, 5) : null;
-    const ma10 = rows.length >= 10 ? latestMovingAverage(rows, 10) : null;
-    const ma17 = rows.length >= 17 ? latestMovingAverage(rows, 17) : null;
+    const ma5 = maRows.length >= 5 ? latestMovingAverage(maRows, 5) : null;
+    const ma10 = maRows.length >= 10 ? latestMovingAverage(maRows, 10) : null;
+    const ma17 = maRows.length >= 17 ? latestMovingAverage(maRows, 17) : null;
     return {
       warningPrice,
       ma5,

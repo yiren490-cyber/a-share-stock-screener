@@ -47,6 +47,10 @@ function quoteLine(symbol, name, code) {
   return `v_${symbol}="${fields.join("~")}";`;
 }
 
+function assertNearlyEqual(actual, expected, message) {
+  assert(Math.abs(actual - expected) < 0.000001, message || `${actual} should equal ${expected}`);
+}
+
 const parsedQuote = watch.parseQuoteLine(quoteLine("sh600519", "贵州茅台", "600519"));
 assert.strictEqual(parsedQuote.latestPrice, 10);
 assert.strictEqual(parsedQuote.volume, 12345600);
@@ -164,12 +168,12 @@ const maStopLevels = watch.calculateStopWarningLevels(
   { latestPrice: 8.2, rawTime: "2026-07-24 11:00" }
 );
 assert.strictEqual(maStopLevels.warningPrice, 4);
-assert.strictEqual(maStopLevels.ma5, 6);
-assert.strictEqual(maStopLevels.ma10, 8.5);
-assert.strictEqual(maStopLevels.ma17, 12);
+assertNearlyEqual(maStopLevels.ma5, 6.04);
+assertNearlyEqual(maStopLevels.ma10, 8.02);
+assertNearlyEqual(maStopLevels.ma17, 11.305882352941177);
 assert.strictEqual(maStopLevels.warningPriceActive, false);
 assert.strictEqual(maStopLevels.ma5Active, false);
-assert.strictEqual(maStopLevels.ma10Active, true);
+assert.strictEqual(maStopLevels.ma10Active, false);
 assert.strictEqual(maStopLevels.ma17Active, true);
 assert(watchHtml.includes('data-stop-alert="warningPrice"'), "watch page should show BOLL short stop warning price light");
 assert(watchHtml.includes('data-stop-alert="ma5"'), "watch page should show MA5 stop light");
