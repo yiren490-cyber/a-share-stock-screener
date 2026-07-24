@@ -297,6 +297,11 @@ assert.strictEqual(JSON.stringify(removeSymbolFromCategoryGroup({ A: ["sh600519"
 assert(appSource.includes("<details"), "managed categories should render collapsible details for stock lists");
 assert(appSource.includes("data-remove-category-symbol"), "managed category stock rows should include per-stock delete actions");
 assert(appSource.includes("data-rename-category"), "managed category rows should include rename actions");
+assert(/\.manage-category-row details\s*\{[^}]*grid-column:\s*1\s*\/\s*-1;/s.test(stylesSource), "expanded managed category stock list should use the full dialog width");
+const managedCategoryStockSpanRule = stylesSource.match(/\.manage-category-stock span\s*\{[^}]*\}/);
+assert(managedCategoryStockSpanRule, "managed category stock label CSS rule should exist");
+assert(!/text-overflow:\s*ellipsis;/.test(managedCategoryStockSpanRule[0]), "managed category stock label should not truncate names and codes");
+assert(/white-space:\s*normal;/.test(managedCategoryStockSpanRule[0]), "managed category stock label should wrap full names and codes instead of showing only the first digit");
 
 ["bj920222", "sz301234", "sh688618", "sz301158", "bj920193"].forEach((symbol) => {
   assert(listingDatesSource.includes(`"${symbol}"`), `static listing dates should include ${symbol}`);

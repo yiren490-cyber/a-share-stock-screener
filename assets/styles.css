@@ -823,6 +823,7 @@ tbody tr:nth-child(even) {
 }
 
 .manage-category-row details {
+  grid-column: 1 / -1;
   min-width: 0;
 }
 
@@ -876,9 +877,9 @@ tbody tr:nth-child(even) {
 }
 
 .manage-category-stock span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow: visible;
+  white-space: normal;
+  word-break: break-all;
 }
 
 .empty-note {
