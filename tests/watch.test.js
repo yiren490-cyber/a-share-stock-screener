@@ -358,6 +358,18 @@ assert(intradayInfo.includes('<span class="watch-pct is-up">涨幅:1.25%</span>'
 assert(intradayInfo.includes("均价:9.90"));
 assert.strictEqual(watch.renderKlineInfo({ date: "2026-07-17 13:30", open: 31.8, close: 32.23, low: 31.5, high: 32.8 }), "2026-07-17 13:30  收:32.23  开:31.80  低:31.50  高:32.80");
 assert.strictEqual(watch.renderKlineInfo(null), "等待数据");
+assert.deepStrictEqual(
+  watch.resolveBannerDisplay({ soundEnabled: false, previousAlertCount: 0, defaultBannerText: "等待机会", bannerItems: [{ id: "a", text: "预警启动" }], selectedBannerId: "a" }),
+  { text: "等待机会", mode: "default" },
+  "default banner should show when alert conditions are not met"
+);
+assert.deepStrictEqual(
+  watch.resolveBannerDisplay({ soundEnabled: true, previousAlertCount: 2, defaultBannerText: "等待机会", bannerItems: [{ id: "a", text: "预警启动" }], selectedBannerId: "a" }),
+  { text: "预警启动", mode: "alert" },
+  "alert banner should override default banner when two lights are on"
+);
+assert(watchHtml.includes('id="watchDefaultBannerInput"'), "banner dialog should include a default banner input");
+assert(/\.watch-alert-banner\.is-default\s*\{[\s\S]*?\}/.test(stylesSource), "default banner should have a separate blue style");
 assert.strictEqual(watch.hasStoredAlertAudio({ uploadedAudioUrl: "blob:http://local/audio" }), true);
 assert.strictEqual(watch.hasStoredAlertAudio({ uploadedAudioUrl: "" }), false);
 assert.deepStrictEqual(watch.mergeAudioItems([{ id: "a", name: "旧", savedAt: 1 }, { id: "a", name: "新", savedAt: 2 }, { id: "b", name: "另一个", savedAt: 1 }]), [

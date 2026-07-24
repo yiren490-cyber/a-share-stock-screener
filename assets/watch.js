@@ -28,6 +28,7 @@
   const SEARCH_HISTORY_KEY = "stockWatchSearchHistory";
   const BANNER_ITEMS_KEY = "stockWatchBannerItems";
   const SELECTED_BANNER_KEY = "stockWatchSelectedBanner";
+  const DEFAULT_BANNER_KEY = "stockWatchDefaultBanner";
   const QUOTE_NAME_CACHE_KEY = "stockWatchQuoteNames";
   const SELECTED_AUDIO_KEY = "stockWatchSelectedAudioId";
   const SOUND_ENABLED_KEY = "stockWatchSoundEnabled";
@@ -561,6 +562,7 @@
       alertLoopActive: false,
       bannerItems: readBannerItems(root.localStorage),
       selectedBannerId: root.localStorage.getItem(SELECTED_BANNER_KEY) || "",
+      defaultBannerText: root.localStorage.getItem(DEFAULT_BANNER_KEY) || "",
       notesBySymbol: readStockNotes(root.localStorage),
       activeNoteType: "watch",
       quoteLoading: false,
@@ -617,6 +619,8 @@
       bannerButton: doc.getElementById("watchBannerButton"),
       bannerModal: doc.getElementById("watchBannerModal"),
       bannerCloseButton: doc.getElementById("watchBannerCloseButton"),
+      defaultBannerInput: doc.getElementById("watchDefaultBannerInput"),
+      defaultBannerSaveButton: doc.getElementById("watchDefaultBannerSaveButton"),
       bannerInput: doc.getElementById("watchBannerInput"),
       bannerAddButton: doc.getElementById("watchBannerAddButton"),
       bannerList: doc.getElementById("watchBannerList"),
@@ -663,6 +667,7 @@
     els.bannerInput.addEventListener("keydown", (event) => {
       if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) addBannerFromInput(state, els);
     });
+    els.defaultBannerSaveButton.addEventListener("click", () => saveDefaultBannerFromInput(state, els));
     els.notesButton.addEventListener("mouseenter", () => showNotesPreview(state, els));
     els.notesButton.addEventListener("mouseleave", () => hideNotesPreview(els));
     els.notesButton.addEventListener("click", () => openNotesModal(state, els));
@@ -751,6 +756,7 @@
   function saveBannerSettings(state) {
     root.localStorage.setItem(BANNER_ITEMS_KEY, JSON.stringify(state.bannerItems));
     root.localStorage.setItem(SELECTED_BANNER_KEY, state.selectedBannerId || "");
+    root.localStorage.setItem(DEFAULT_BANNER_KEY, state.defaultBannerText || "");
   }
 
   function readQuoteNameCache(storage) {
@@ -775,8 +781,16 @@
     return item ? item.text : "";
   }
 
+  function resolveBannerDisplay(state) {
+    const alertText = selectedBannerText(state);
+    if (state && state.soundEnabled && state.previousAlertCount >= 2 && alertText) return { text: alertText, mode: "alert" };
+    const defaultText = String((state && state.defaultBannerText) || "").trim();
+    return defaultText ? { text: defaultText, mode: "default" } : { text: "", mode: "" };
+  }
+
   function renderBannerList(state, els) {
     if (!els.bannerList) return;
+    if (els.defaultBannerInput) els.defaultBannerInput.value = state.defaultBannerText || "";
     if (!state.bannerItems.length) {
       els.bannerList.innerHTML = '<p class="watch-banner-empty">暂无横幅内容</p>';
       updateAlertBanner(state, els);
@@ -843,13 +857,20 @@
     renderBannerList(state, els);
   }
 
+  function saveDefaultBannerFromInput(state, els) {
+    state.defaultBannerText = String((els.defaultBannerInput && els.defaultBannerInput.value) || "").trim();
+    saveBannerSettings(state);
+    updateAlertBanner(state, els);
+  }
+
   function updateAlertBanner(state, els) {
     if (!els.alertBanner) return;
-    const text = selectedBannerText(state);
-    const shouldShow = Boolean(state.soundEnabled && state.previousAlertCount >= 2 && text);
-    els.alertBanner.classList.toggle("is-active", shouldShow);
+    const display = resolveBannerDisplay(state);
+    els.alertBanner.classList.toggle("is-active", display.mode === "alert");
+    els.alertBanner.classList.toggle("is-default", display.mode === "default");
+    els.alertBanner.classList.toggle("is-visible", Boolean(display.text));
     const content = els.alertBanner.querySelector("span");
-    if (content) content.textContent = shouldShow ? text : "";
+    if (content) content.textContent = display.text;
   }
 
   function normalizeStockNotes(value) {
@@ -2270,6 +2291,7 @@
     addSearchHistory,
     removeSearchHistory,
     normalizeBannerItems,
+    resolveBannerDisplay,
     readQuoteNameCache,
     normalizeStockNotes,
     updateStockNote,

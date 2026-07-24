@@ -810,9 +810,9 @@ tbody tr:nth-child(even) {
 
 .manage-category-row {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: minmax(0, 1fr) minmax(120px, 0.8fr) auto auto;
   gap: 8px;
-  align-items: center;
+  align-items: start;
   padding: 8px;
   border: 1px solid #d8e1eb;
   border-radius: 6px;
@@ -822,12 +822,63 @@ tbody tr:nth-child(even) {
   font-weight: 700;
 }
 
+.manage-category-row details {
+  min-width: 0;
+}
+
+.manage-category-row summary {
+  cursor: pointer;
+  line-height: 28px;
+}
+
+.manage-category-row input {
+  height: 28px;
+  min-width: 0;
+  padding: 0 8px;
+  border: 1px solid #cbd5e1;
+  border-radius: 5px;
+  background: #ffffff;
+  font-size: 12px;
+}
+
 .manage-category-row button {
   height: 28px;
   padding: 0 9px;
+  font-size: 12px;
+}
+
+.manage-category-row button[data-rename-category] {
+  border-color: #2563eb;
+  background: #2563eb;
+}
+
+.manage-category-row button[data-delete-category],
+.manage-category-stock button {
   border-color: #dc2626;
   background: #dc2626;
-  font-size: 12px;
+}
+
+.manage-category-stocks {
+  display: grid;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.manage-category-stock {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 5px;
+  background: #ffffff;
+}
+
+.manage-category-stock span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .empty-note {
@@ -1509,6 +1560,24 @@ svg {
 .watch-banner-dialog textarea {
   min-height: 78px;
   resize: vertical;
+}
+
+.watch-default-banner-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 104px;
+  gap: 8px;
+  align-items: stretch;
+  margin-bottom: 10px;
+}
+
+.watch-default-banner-row textarea {
+  min-height: 48px;
+}
+
+.watch-default-banner-row button {
+  height: auto;
+  padding: 0 10px;
+  font-size: 12px;
 }
 
 .watch-banner-dialog > button {
@@ -2196,7 +2265,16 @@ svg {
   background: #fff1f2;
 }
 
-.watch-alert-banner.is-active span {
+.watch-alert-banner.is-default {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+}
+
+.watch-alert-banner.is-default span {
+  color: #1d4ed8;
+}
+
+.watch-alert-banner.is-visible span {
   display: inline-block;
 }
 

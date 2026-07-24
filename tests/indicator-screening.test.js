@@ -77,12 +77,14 @@ sandbox.window.localStorage = sandbox.localStorage;
 vm.createContext(sandbox);
 vm.runInContext(appSource, sandbox);
 
-const { collectIndicatorMetrics, defaultIndicatorPlan, evaluateIndicatorPlan, parseTencentQuote, quoteMatches, summarizeBacktestTrades } = sandbox.window.aShareAnalyzer;
+const { collectIndicatorMetrics, defaultIndicatorPlan, evaluateIndicatorPlan, parseTencentQuote, quoteMatches, removeSymbolFromCategoryGroup, renameCategoryGroup, summarizeBacktestTrades } = sandbox.window.aShareAnalyzer;
 
 assert.strictEqual(typeof evaluateIndicatorPlan, "function", "evaluateIndicatorPlan should be exported");
 assert.strictEqual(typeof parseTencentQuote, "function", "parseTencentQuote should be exported");
 assert.strictEqual(typeof quoteMatches, "function", "quoteMatches should be exported");
 assert.strictEqual(typeof summarizeBacktestTrades, "function", "summarizeBacktestTrades should be exported");
+assert.strictEqual(typeof renameCategoryGroup, "function", "category management should export renameCategoryGroup");
+assert.strictEqual(typeof removeSymbolFromCategoryGroup, "function", "category management should export removeSymbolFromCategoryGroup");
 
 function quoteLine(symbol, name, code) {
   const fields = Array.from({ length: 50 }, () => "");
@@ -285,6 +287,16 @@ assert(
   /els\.mainIndicatorSelect\.addEventListener\("change", \(\) => \{[\s\S]*?renderMainChartOnly\(\);[\s\S]*?\}\);/.test(appSource),
   "main indicator changes should not rerender subcharts"
 );
+assert.strictEqual(JSON.stringify(renameCategoryGroup({ A: ["sh600519", "sz000001"], B: ["sh600519", "bj430047"] }, "A", "B")), JSON.stringify({
+  B: ["sh600519", "bj430047", "sz000001"],
+}));
+assert.strictEqual(JSON.stringify(removeSymbolFromCategoryGroup({ A: ["sh600519", "sz000001"], B: ["bj430047"] }, "A", "sh600519")), JSON.stringify({
+  A: ["sz000001"],
+  B: ["bj430047"],
+}));
+assert(appSource.includes("<details"), "managed categories should render collapsible details for stock lists");
+assert(appSource.includes("data-remove-category-symbol"), "managed category stock rows should include per-stock delete actions");
+assert(appSource.includes("data-rename-category"), "managed category rows should include rename actions");
 
 ["bj920222", "sz301234", "sh688618", "sz301158", "bj920193"].forEach((symbol) => {
   assert(listingDatesSource.includes(`"${symbol}"`), `static listing dates should include ${symbol}`);

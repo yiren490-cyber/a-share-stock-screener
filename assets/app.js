@@ -1335,10 +1335,61 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
     if (!els.categorySelect.value) els.categorySelect.selectedIndex = 0;
   }
 
+  function renameCategoryGroup(categories, fromName, toName) {
+    const sourceName = String(fromName || "").trim();
+    const targetName = String(toName || "").trim();
+    const next = { ...(categories || {}) };
+    if (!sourceName || !targetName || !next[sourceName]) return next;
+    if (sourceName === targetName) return next;
+    next[targetName] = [...new Set([...(next[targetName] || []), ...next[sourceName]])];
+    delete next[sourceName];
+    return next;
+  }
+
+  function removeSymbolFromCategoryGroup(categories, categoryName, symbol) {
+    const name = String(categoryName || "").trim();
+    const next = { ...(categories || {}) };
+    if (!name || !Array.isArray(next[name])) return next;
+    next[name] = next[name].filter((item) => item !== symbol);
+    return next;
+  }
+
+  function saveCategories() {
+    localStorage.setItem("aShareCategories", JSON.stringify(state.categories));
+  }
+
+  function categoryStockLabel(symbol) {
+    const quote = state.quotes.find((item) => item.symbol === symbol);
+    return quote ? `${quote.name} ${quote.code}` : symbol.slice(2);
+  }
+
   function renderManageCategoryList() {
     const names = Object.keys(state.categories).sort((a, b) => a.localeCompare(b, "zh-CN"));
     els.manageCategoryList.innerHTML = names.length
-      ? names.map((name) => `<div class="manage-category-row"><span>${escapeHtml(name)}（${state.categories[name].length}）</span><button type="button" data-delete-category="${escapeHtml(name)}">删除</button></div>`).join("")
+      ? names
+          .map((name) => {
+            const stocks = state.categories[name] || [];
+            const stockRows = stocks.length
+              ? stocks
+                  .map(
+                    (symbol) => `<div class="manage-category-stock">
+                      <span>${escapeHtml(categoryStockLabel(symbol))}</span>
+                      <button type="button" data-remove-category-symbol="${escapeHtml(symbol)}" data-category-name="${escapeHtml(name)}">删除</button>
+                    </div>`
+                  )
+                  .join("")
+              : `<p class="empty-note">空分组</p>`;
+            return `<div class="manage-category-row">
+              <details>
+                <summary>${escapeHtml(name)}（${stocks.length}）</summary>
+                <div class="manage-category-stocks">${stockRows}</div>
+              </details>
+              <input type="text" value="${escapeHtml(name)}" data-category-rename-input />
+              <button type="button" data-rename-category="${escapeHtml(name)}">保存名称</button>
+              <button type="button" data-delete-category="${escapeHtml(name)}">删除分组</button>
+            </div>`;
+          })
+          .join("")
       : `<p class="empty-note">暂无分组</p>`;
   }
 
@@ -1358,7 +1409,7 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
       return;
     }
     if (!state.categories[name]) state.categories[name] = [];
-    localStorage.setItem("aShareCategories", JSON.stringify(state.categories));
+    saveCategories();
     els.managedCategoryNameInput.value = "";
     renderCategorySelect();
     renderManageCategoryList();
@@ -1368,11 +1419,35 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
   function deleteCategory(name) {
     delete state.categories[name];
     if (state.activeCategory === name) state.activeCategory = "";
-    localStorage.setItem("aShareCategories", JSON.stringify(state.categories));
+    saveCategories();
     renderCategorySelect();
     renderManageCategoryList();
     applyFilters();
     els.statusText.textContent = `已删除分组：${name}`;
+  }
+
+  function renameManagedCategory(oldName, newName) {
+    const targetName = String(newName || "").trim();
+    if (!targetName) {
+      els.statusText.textContent = "请填写分组名。";
+      return;
+    }
+    state.categories = renameCategoryGroup(state.categories, oldName, targetName);
+    if (state.activeCategory === oldName) state.activeCategory = targetName;
+    saveCategories();
+    renderCategorySelect();
+    renderManageCategoryList();
+    applyFilters();
+    els.statusText.textContent = `已修改分组名称：${targetName}`;
+  }
+
+  function removeManagedCategorySymbol(categoryName, symbol) {
+    state.categories = removeSymbolFromCategoryGroup(state.categories, categoryName, symbol);
+    saveCategories();
+    renderCategorySelect();
+    renderManageCategoryList();
+    applyFilters();
+    els.statusText.textContent = `已从分组移除：${symbol}`;
   }
 
   function currentPageQuotes() {
@@ -4123,8 +4198,20 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
     els.saveManagedCategoryButton.addEventListener("click", saveManagedCategory);
     els.addManagedCategoryButton.addEventListener("click", () => els.managedCategoryNameInput.focus());
     els.manageCategoryList.addEventListener("click", (event) => {
-      const button = event.target.closest("[data-delete-category]");
-      if (button) deleteCategory(button.dataset.deleteCategory);
+      const deleteButton = event.target.closest("[data-delete-category]");
+      if (deleteButton) {
+        deleteCategory(deleteButton.dataset.deleteCategory);
+        return;
+      }
+      const renameButton = event.target.closest("[data-rename-category]");
+      if (renameButton) {
+        const row = renameButton.closest(".manage-category-row");
+        const input = row && row.querySelector("[data-category-rename-input]");
+        renameManagedCategory(renameButton.dataset.renameCategory, input && input.value);
+        return;
+      }
+      const removeButton = event.target.closest("[data-remove-category-symbol]");
+      if (removeButton) removeManagedCategorySymbol(removeButton.dataset.categoryName, removeButton.dataset.removeCategorySymbol);
     });
     els.clearCategoryButton.addEventListener("click", () => {
       state.activeCategory = "";
@@ -4166,6 +4253,6 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
   updateMaFilterLabel();
   bindEvents();
   renderQuoteTable();
-  window.aShareAnalyzer = { fetchQuotes, parseTencentQuote, quoteMatches, fetchKline, fetchKlineForPeriod, quotePassesIndicatorPlan, executeFormula, calculateMainForce, evaluateIndicatorPlan, collectIndicatorMetrics, summarizeBacktestTrades, defaultIndicatorPlan: DEFAULT_INDICATOR_PLAN, mainForceFormula: MAIN_FORCE_FORMULA, debugState: () => state };
+  window.aShareAnalyzer = { fetchQuotes, parseTencentQuote, quoteMatches, fetchKline, fetchKlineForPeriod, quotePassesIndicatorPlan, executeFormula, calculateMainForce, evaluateIndicatorPlan, collectIndicatorMetrics, summarizeBacktestTrades, renameCategoryGroup, removeSymbolFromCategoryGroup, defaultIndicatorPlan: DEFAULT_INDICATOR_PLAN, mainForceFormula: MAIN_FORCE_FORMULA, debugState: () => state };
 })();
 
