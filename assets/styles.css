@@ -1939,8 +1939,78 @@ svg {
 }
 
 .watch-intraday-card {
+  position: relative;
+  overflow: hidden;
   padding-left: 4px;
   padding-right: 4px;
+}
+
+.watch-intraday-card::before,
+.watch-intraday-card::after {
+  content: "";
+  position: absolute;
+  top: 58px;
+  right: 4px;
+  bottom: 10px;
+  left: 4px;
+  z-index: 2;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+
+.watch-intraday-card::before {
+  background:
+    linear-gradient(90deg, rgba(220, 38, 38, 0.08), rgba(220, 38, 38, 0.01) 30%, rgba(220, 38, 38, 0.07)),
+    radial-gradient(circle at 84% 14%, rgba(239, 68, 68, 0.12), transparent 32%);
+}
+
+.watch-intraday-card::after {
+  background:
+    linear-gradient(112deg, transparent 0 38%, rgba(248, 113, 113, 0.28) 39%, transparent 42%),
+    repeating-linear-gradient(100deg, transparent 0 15px, rgba(185, 28, 28, 0.12) 16px, transparent 17px);
+  animation: watch-stop-storm 2.8s linear infinite;
+}
+
+.watch-intraday-card.stop-risk-1::before {
+  opacity: 0.35;
+}
+
+.watch-intraday-card.stop-risk-2::before {
+  opacity: 0.56;
+}
+
+.watch-intraday-card.stop-risk-3::before {
+  opacity: 0.74;
+  animation: watch-stop-pulse 2.4s ease-in-out infinite;
+}
+
+.watch-intraday-card.stop-risk-4::before {
+  opacity: 0.9;
+  animation: watch-stop-pulse 1.8s ease-in-out infinite;
+}
+
+.watch-intraday-card.stop-risk-4::after {
+  opacity: 0.22;
+}
+
+@keyframes watch-stop-pulse {
+  0%,
+  100% {
+    opacity: 0.62;
+  }
+  50% {
+    opacity: 0.92;
+  }
+}
+
+@keyframes watch-stop-storm {
+  0% {
+    transform: translate3d(0, -12px, 0);
+  }
+  100% {
+    transform: translate3d(-18px, 18px, 0);
+  }
 }
 
 .watch-chart-info {

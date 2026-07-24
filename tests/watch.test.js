@@ -143,6 +143,19 @@ assert.deepStrictEqual(stopLevels, {
   ma10Active: false,
   ma17Active: false,
 });
+assert.strictEqual(
+  watch.calculateStopRiskLevel({
+    warningPriceActive: true,
+    ma5Active: false,
+    ma10Active: true,
+    ma17Active: true,
+  }),
+  3,
+  "stop risk level should equal the number of active stop warning lights"
+);
+assert.strictEqual(watch.calculateStopRiskLevel({}), 0, "missing stop warning states should not raise the risk level");
+assert(watchSource.includes("stop-risk-${riskLevel}"), "intraday card should receive a stop-risk level class");
+assert(/\.watch-intraday-card\.stop-risk-4::after/.test(stylesSource), "highest stop risk level should add a subtle weather effect");
 
 const maStopLevels = watch.calculateStopWarningLevels(
   [

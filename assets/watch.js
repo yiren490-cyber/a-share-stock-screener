@@ -451,6 +451,10 @@
     };
   }
 
+  function calculateStopRiskLevel(levels) {
+    return ["warningPriceActive", "ma5Active", "ma10Active", "ma17Active"].filter((key) => levels && levels[key]).length;
+  }
+
   function calculateBoll(rows, period = 20) {
     const mid = movingAverage(rows, period, "close");
     return rows.map((row, index) => {
@@ -599,6 +603,7 @@
       notesEditor: doc.getElementById("watchNotesEditor"),
       stockMeta: doc.getElementById("watchStockMeta"),
       priceBadge: doc.getElementById("watchPriceBadge"),
+      intradayCard: doc.querySelector(".watch-intraday-card"),
       intradayChart: doc.getElementById("intradayChart"),
       intradayInfo: doc.getElementById("intradayInfo"),
       orderBook: doc.getElementById("orderBook"),
@@ -1959,6 +1964,12 @@
       const text = node.querySelector("strong");
       if (text) text.textContent = `${label}：${formatNumber(value)}`;
     });
+    const riskLevel = calculateStopRiskLevel(levels);
+    const card = els.intradayCard || (els.intradayChart && els.intradayChart.closest && els.intradayChart.closest(".watch-intraday-card"));
+    if (card && card.classList) {
+      ["stop-risk-0", "stop-risk-1", "stop-risk-2", "stop-risk-3", "stop-risk-4"].forEach((name) => card.classList.remove(name));
+      card.classList.add(`stop-risk-${riskLevel}`);
+    }
   }
 
   async function setSoundEnabled(state, els, enabled) {
@@ -2238,6 +2249,7 @@
     mergePanelSettings,
     evaluateAlerts,
     calculateStopWarningLevels,
+    calculateStopRiskLevel,
     tradingSessionTicks,
     minuteToTradingSlot,
     slotToTradingTime,
