@@ -156,6 +156,8 @@ assert.strictEqual(
 assert.strictEqual(watch.calculateStopRiskLevel({}), 0, "missing stop warning states should not raise the risk level");
 assert(watchSource.includes("stop-risk-${riskLevel}"), "intraday card should receive a stop-risk level class");
 assert(/\.watch-intraday-card\.stop-risk-4::after/.test(stylesSource), "highest stop risk level should add a subtle weather effect");
+assert(/\.watch-intraday-card\.stop-risk-4\s*\{[\s\S]*?box-shadow:\s*0 0 0 2px rgba\(220, 38, 38, 0\.55\)/.test(stylesSource), "highest stop risk level should have a clear red danger frame");
+assert(/\.watch-intraday-card\.stop-risk-4::after\s*\{[\s\S]*?opacity:\s*0\.48;/.test(stylesSource), "highest stop risk weather effect should be visibly stronger");
 
 const maStopLevels = watch.calculateStopWarningLevels(
   [

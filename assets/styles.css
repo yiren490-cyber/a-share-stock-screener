@@ -1961,15 +1961,15 @@ svg {
 
 .watch-intraday-card::before {
   background:
-    linear-gradient(90deg, rgba(220, 38, 38, 0.08), rgba(220, 38, 38, 0.01) 30%, rgba(220, 38, 38, 0.07)),
-    radial-gradient(circle at 84% 14%, rgba(239, 68, 68, 0.12), transparent 32%);
+    linear-gradient(90deg, rgba(220, 38, 38, 0.16), rgba(220, 38, 38, 0.03) 30%, rgba(220, 38, 38, 0.14)),
+    radial-gradient(circle at 84% 14%, rgba(239, 68, 68, 0.24), transparent 32%);
 }
 
 .watch-intraday-card::after {
   background:
-    linear-gradient(112deg, transparent 0 38%, rgba(248, 113, 113, 0.28) 39%, transparent 42%),
-    repeating-linear-gradient(100deg, transparent 0 15px, rgba(185, 28, 28, 0.12) 16px, transparent 17px);
-  animation: watch-stop-storm 2.8s linear infinite;
+    linear-gradient(112deg, transparent 0 35%, rgba(248, 113, 113, 0.5) 36%, rgba(248, 113, 113, 0.18) 38%, transparent 42%),
+    repeating-linear-gradient(100deg, transparent 0 12px, rgba(185, 28, 28, 0.28) 13px, transparent 15px);
+  animation: watch-stop-storm 1.8s linear infinite;
 }
 
 .watch-intraday-card.stop-risk-1::before {
@@ -1986,12 +1986,17 @@ svg {
 }
 
 .watch-intraday-card.stop-risk-4::before {
-  opacity: 0.9;
-  animation: watch-stop-pulse 1.8s ease-in-out infinite;
+  opacity: 1;
+  animation: watch-stop-pulse 1.35s ease-in-out infinite;
 }
 
 .watch-intraday-card.stop-risk-4::after {
-  opacity: 0.22;
+  opacity: 0.48;
+}
+
+.watch-intraday-card.stop-risk-4 {
+  box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.55), 0 0 24px rgba(220, 38, 38, 0.45), inset 0 0 26px rgba(220, 38, 38, 0.16);
+  border-color: rgba(220, 38, 38, 0.55);
 }
 
 @keyframes watch-stop-pulse {
