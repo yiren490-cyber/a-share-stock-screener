@@ -176,6 +176,14 @@ assert.strictEqual(
 
 const defaultShortBuyDaysCondition = defaultIndicatorPlan.conditions.find((condition) => condition.indicator === "boll-short" && condition.field === "shortBuyDays");
 assert.strictEqual(JSON.stringify(defaultShortBuyDaysCondition), JSON.stringify({ indicator: "boll-short", period: "day", field: "shortBuyDays", operator: "lte", value: "3" }));
+assert.strictEqual(
+  JSON.stringify(defaultIndicatorPlan.conditions.filter((condition) => condition.indicator === "boll-short" && ["pctChange", "ma5DistancePct", "volumeRatio5"].includes(condition.field))),
+  JSON.stringify([
+    { indicator: "boll-short", period: "day", field: "pctChange", operator: "lte", value: "6" },
+    { indicator: "boll-short", period: "day", field: "ma5DistancePct", operator: "lte", value: "8" },
+    { indicator: "boll-short", period: "day", field: "volumeRatio5", operator: "gte", value: "0.8" },
+  ])
+);
 
 const bollSignalRows = [10, 9, 8, 8.5, 10, 9.8, 9.6].map((close, index) => ({
   date: `2026-07-${String(index + 1).padStart(2, "0")}`,
@@ -186,10 +194,29 @@ const bollSignalRows = [10, 9, 8, 8.5, 10, 9.8, 9.6].map((close, index) => ({
   volume: 1000,
 }));
 assert.strictEqual(collectIndicatorMetrics(bollSignalRows, [], {})["boll-short"].shortBuyDays, 2);
+const guardrailRows = [10, 10.2, 10.4, 10.6, 10.8, 11].map((close, index) => ({
+  date: `2026-08-${String(index + 1).padStart(2, "0")}`,
+  open: close - 0.1,
+  close,
+  high: close + 0.2,
+  low: close - 0.2,
+  volume: [1000, 1100, 1200, 1300, 1400, 2000][index],
+}));
+const guardrailMetrics = collectIndicatorMetrics(guardrailRows, [], {})["boll-short"];
+assert.strictEqual(Number(guardrailMetrics.pctChange.toFixed(2)), 1.85);
+assert.strictEqual(Number(guardrailMetrics.ma5DistancePct.toFixed(2)), 3.77);
+assert.strictEqual(Number(guardrailMetrics.volumeRatio5.toFixed(2)), 1.43);
 assert.strictEqual(
   evaluateIndicatorPlan(
-    { conditions: [{ indicator: "boll-short", field: "shortBuyDays", operator: "lte", value: "3" }] },
-    { "boll-short": { shortBuyDays: 2 } }
+    {
+      conditions: [
+        { indicator: "boll-short", field: "shortBuyDays", operator: "lte", value: "3" },
+        { indicator: "boll-short", field: "pctChange", operator: "lte", value: "6" },
+        { indicator: "boll-short", field: "ma5DistancePct", operator: "lte", value: "8" },
+        { indicator: "boll-short", field: "volumeRatio5", operator: "gte", value: "0.8" },
+      ],
+    },
+    { "boll-short": { shortBuyDays: 2, pctChange: 1.85, ma5DistancePct: 3.77, volumeRatio5: 1.43 } }
   ).passed,
   true
 );

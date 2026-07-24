@@ -131,6 +131,9 @@
         ["ma17", "MA17", "number"],
         ["ma60", "MA60", "number"],
         ["shortBuyDays", "短买距今天数", "number"],
+        ["pctChange", "当日涨幅", "number"],
+        ["ma5DistancePct", "偏离5日线%", "number"],
+        ["volumeRatio5", "量比5日均量", "number"],
       ],
     },
     { key: "volume", label: "成交量", fields: [["volume", "成交量", "number"], ["barColor", "量柱颜色", "select", ["红色", "绿色"]]] },
@@ -160,6 +163,9 @@
       { indicator: "boll-short", period: "day", field: "lowerColor", operator: "eq", value: "红色" },
       { indicator: "boll-short", period: "day", field: "close", operator: "gt", value: "ma5" },
       { indicator: "boll-short", period: "day", field: "close", operator: "lt", value: "ub" },
+      { indicator: "boll-short", period: "day", field: "pctChange", operator: "lte", value: "6" },
+      { indicator: "boll-short", period: "day", field: "ma5DistancePct", operator: "lte", value: "8" },
+      { indicator: "boll-short", period: "day", field: "volumeRatio5", operator: "gte", value: "0.8" },
       { indicator: "ma", period: "day", field: "gapUp", operator: "eq", value: "是" },
       { indicator: "main-force", period: "day", field: "shortAttack", operator: "gt", value: "0" },
       { indicator: "gold-chip", period: "day", field: "mainChip", operator: "gt", value: "0" },
@@ -1059,6 +1065,25 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
     return null;
   }
 
+  function pctChangeAt(rows, index) {
+    const row = rows[index];
+    const previous = rows[index - 1];
+    if (!row || !previous || !Number.isFinite(row.close) || !Number.isFinite(previous.close) || previous.close === 0) return null;
+    return ((row.close - previous.close) / previous.close) * 100;
+  }
+
+  function distancePct(value, base) {
+    if (!Number.isFinite(value) || !Number.isFinite(base) || base === 0) return null;
+    return ((value - base) / base) * 100;
+  }
+
+  function volumeRatioAt(rows, index, period = 5) {
+    const row = rows[index];
+    const averageVolume = movingAverage(rows, period, "volume")[index];
+    if (!row || !Number.isFinite(row.volume) || !Number.isFinite(averageVolume) || averageVolume === 0) return null;
+    return row.volume / averageVolume;
+  }
+
   function yesNo(value) {
     return value ? "是" : "否";
   }
@@ -1091,6 +1116,9 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
       lowerColor: boll.buy !== null && boll.buy !== undefined ? "红色" : "绿色",
       close: rows[index] ? rows[index].close : null,
       shortBuyDays: shortBuyDaysAt(bollRows, index),
+      pctChange: pctChangeAt(rows, index),
+      ma5DistancePct: distancePct(rows[index] ? rows[index].close : null, maMap.ma5),
+      volumeRatio5: volumeRatioAt(rows, index, 5),
     };
   }
 
@@ -1688,6 +1716,9 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
           lowerColor: boll.buy !== null && boll.buy !== undefined ? "红色" : "绿色",
           close: last ? last.close : null,
           shortBuyDays: shortBuyDaysAt(source.values, index),
+          pctChange: pctChangeAt(rows, index),
+          ma5DistancePct: distancePct(last ? last.close : null, source.ma5[index]),
+          volumeRatio5: volumeRatioAt(rows, index, 5),
           gapUp: gapUpLabel(rows, index),
         };
         if (indicator === "ma") return { close: metrics.close, ma5: metrics.ma5, ma10: metrics.ma10, ma17: metrics.ma17, ma20: metrics.ma20, ma30: metrics.ma30, ma60: metrics.ma60, ma120: metrics.ma120, ma250: metrics.ma250, gapUp: metrics.gapUp };
