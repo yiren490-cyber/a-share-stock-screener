@@ -156,6 +156,9 @@ assert.strictEqual(
 assert.strictEqual(watch.calculateStopRiskLevel({}), 0, "missing stop warning states should not raise the risk level");
 assert(watchSource.includes("stop-risk-${riskLevel}"), "intraday card should receive a stop-risk level class");
 assert(/\.watch-intraday-card\.stop-risk-4::after/.test(stylesSource), "highest stop risk level should add a subtle weather effect");
+assert(/\.watch-intraday-card\.stop-risk-1\s*\{[\s\S]*?box-shadow:\s*0 0 0 1px rgba\(248, 113, 113, 0\.65\)/.test(stylesSource), "first stop risk level should already look like a danger warning");
+assert(/\.watch-intraday-card\.stop-risk-2\s*\{[\s\S]*?box-shadow:\s*0 0 0 2px rgba\(239, 68, 68, 0\.65\)/.test(stylesSource), "second stop risk level should have a stronger danger frame");
+assert(/\.watch-intraday-card\.stop-risk-3\s*\{[\s\S]*?box-shadow:\s*0 0 0 2px rgba\(220, 38, 38, 0\.75\)/.test(stylesSource), "third stop risk level should have an urgent danger frame");
 assert(/\.watch-intraday-card\.stop-risk-4\s*\{[\s\S]*?box-shadow:\s*0 0 0 2px rgba\(220, 38, 38, 0\.55\)/.test(stylesSource), "highest stop risk level should have a clear red danger frame");
 assert(/\.watch-intraday-card\.stop-risk-4::after\s*\{[\s\S]*?opacity:\s*0\.48;/.test(stylesSource), "highest stop risk weather effect should be visibly stronger");
 

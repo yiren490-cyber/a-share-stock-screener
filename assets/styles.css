@@ -1973,20 +1973,29 @@ svg {
 }
 
 .watch-intraday-card.stop-risk-1::before {
-  opacity: 0.35;
+  opacity: 0.7;
 }
 
 .watch-intraday-card.stop-risk-2::before {
-  opacity: 0.56;
+  opacity: 0.85;
+  animation: watch-stop-pulse 2.2s ease-in-out infinite;
 }
 
 .watch-intraday-card.stop-risk-3::before {
-  opacity: 0.74;
-  animation: watch-stop-pulse 2.4s ease-in-out infinite;
+  opacity: 1;
+  background:
+    linear-gradient(0deg, rgba(185, 28, 28, 0.2), transparent 12%, transparent 88%, rgba(185, 28, 28, 0.2)),
+    linear-gradient(90deg, rgba(220, 38, 38, 0.24), rgba(220, 38, 38, 0.04) 30%, rgba(220, 38, 38, 0.2)),
+    radial-gradient(circle at 84% 14%, rgba(239, 68, 68, 0.3), transparent 32%);
+  animation: watch-stop-pulse 1.7s ease-in-out infinite;
 }
 
 .watch-intraday-card.stop-risk-4::before {
   opacity: 1;
+  background:
+    linear-gradient(0deg, rgba(153, 27, 27, 0.32), transparent 14%, transparent 86%, rgba(153, 27, 27, 0.32)),
+    linear-gradient(90deg, rgba(185, 28, 28, 0.3), rgba(220, 38, 38, 0.06) 28%, rgba(185, 28, 28, 0.26)),
+    radial-gradient(circle at 84% 14%, rgba(239, 68, 68, 0.42), transparent 34%);
   animation: watch-stop-pulse 1.35s ease-in-out infinite;
 }
 
@@ -1994,9 +2003,24 @@ svg {
   opacity: 0.48;
 }
 
+.watch-intraday-card.stop-risk-1 {
+  box-shadow: 0 0 0 1px rgba(248, 113, 113, 0.65), 0 0 14px rgba(248, 113, 113, 0.3), inset 0 0 14px rgba(248, 113, 113, 0.08);
+  border-color: rgba(248, 113, 113, 0.65);
+}
+
+.watch-intraday-card.stop-risk-2 {
+  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.65), 0 0 20px rgba(239, 68, 68, 0.38), inset 0 0 18px rgba(239, 68, 68, 0.12);
+  border-color: rgba(239, 68, 68, 0.65);
+}
+
+.watch-intraday-card.stop-risk-3 {
+  box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.75), 0 0 28px rgba(220, 38, 38, 0.48), inset 0 0 24px rgba(220, 38, 38, 0.18);
+  border-color: rgba(220, 38, 38, 0.75);
+}
+
 .watch-intraday-card.stop-risk-4 {
-  box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.55), 0 0 24px rgba(220, 38, 38, 0.45), inset 0 0 26px rgba(220, 38, 38, 0.16);
-  border-color: rgba(220, 38, 38, 0.55);
+  box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.55), 0 0 36px rgba(185, 28, 28, 0.62), inset 0 0 32px rgba(185, 28, 28, 0.24);
+  border-color: rgba(220, 38, 38, 0.85);
 }
 
 @keyframes watch-stop-pulse {
