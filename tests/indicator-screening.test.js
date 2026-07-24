@@ -77,7 +77,7 @@ sandbox.window.localStorage = sandbox.localStorage;
 vm.createContext(sandbox);
 vm.runInContext(appSource, sandbox);
 
-const { evaluateIndicatorPlan, parseTencentQuote, quoteMatches, summarizeBacktestTrades } = sandbox.window.aShareAnalyzer;
+const { collectIndicatorMetrics, defaultIndicatorPlan, evaluateIndicatorPlan, parseTencentQuote, quoteMatches, summarizeBacktestTrades } = sandbox.window.aShareAnalyzer;
 
 assert.strictEqual(typeof evaluateIndicatorPlan, "function", "evaluateIndicatorPlan should be exported");
 assert.strictEqual(typeof parseTencentQuote, "function", "parseTencentQuote should be exported");
@@ -170,6 +170,26 @@ assert.strictEqual(
     {
       ma: { gapUp: "是" },
     }
+  ).passed,
+  true
+);
+
+const defaultShortBuyDaysCondition = defaultIndicatorPlan.conditions.find((condition) => condition.indicator === "boll-short" && condition.field === "shortBuyDays");
+assert.strictEqual(JSON.stringify(defaultShortBuyDaysCondition), JSON.stringify({ indicator: "boll-short", period: "day", field: "shortBuyDays", operator: "lte", value: "3" }));
+
+const bollSignalRows = [10, 9, 8, 8.5, 10, 9.8, 9.6].map((close, index) => ({
+  date: `2026-07-${String(index + 1).padStart(2, "0")}`,
+  open: close,
+  close,
+  high: close + 0.1,
+  low: close - 0.1,
+  volume: 1000,
+}));
+assert.strictEqual(collectIndicatorMetrics(bollSignalRows, [], {})["boll-short"].shortBuyDays, 2);
+assert.strictEqual(
+  evaluateIndicatorPlan(
+    { conditions: [{ indicator: "boll-short", field: "shortBuyDays", operator: "lte", value: "3" }] },
+    { "boll-short": { shortBuyDays: 2 } }
   ).passed,
   true
 );

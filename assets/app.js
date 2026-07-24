@@ -130,6 +130,7 @@
         ["ma5", "5日均线", "number"],
         ["ma17", "MA17", "number"],
         ["ma60", "MA60", "number"],
+        ["shortBuyDays", "短买距今天数", "number"],
       ],
     },
     { key: "volume", label: "成交量", fields: [["volume", "成交量", "number"], ["barColor", "量柱颜色", "select", ["红色", "绿色"]]] },
@@ -154,6 +155,7 @@
     name: "BOLL短买主力共振测试",
     conditions: [
       { indicator: "boll-short", period: "day", field: "state", operator: "contains", value: "短买,红色持股" },
+      { indicator: "boll-short", period: "day", field: "shortBuyDays", operator: "lte", value: "3" },
       { indicator: "boll-short", period: "day", field: "midColor", operator: "eq", value: "红色" },
       { indicator: "boll-short", period: "day", field: "lowerColor", operator: "eq", value: "红色" },
       { indicator: "boll-short", period: "day", field: "close", operator: "gt", value: "ma5" },
@@ -1050,6 +1052,13 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
     return "绿色观望";
   }
 
+  function shortBuyDaysAt(bollRows, index) {
+    for (let cursor = index; cursor >= 0; cursor -= 1) {
+      if (bollRows[cursor] && bollRows[cursor].shortBuy) return index - cursor;
+    }
+    return null;
+  }
+
   function yesNo(value) {
     return value ? "是" : "否";
   }
@@ -1059,7 +1068,8 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
   }
 
   function bollMetricsAt(rows, index) {
-    const boll = calculateBoll(rows)[index] || {};
+    const bollRows = calculateBoll(rows);
+    const boll = bollRows[index] || {};
     const maMap = {
       ma5: movingAverage(rows, 5, "close")[index],
       ma10: movingAverage(rows, 10, "close")[index],
@@ -1080,6 +1090,7 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
       upperColor: boll.hold !== null && boll.hold !== undefined ? "红色" : "绿色",
       lowerColor: boll.buy !== null && boll.buy !== undefined ? "红色" : "绿色",
       close: rows[index] ? rows[index].close : null,
+      shortBuyDays: shortBuyDaysAt(bollRows, index),
     };
   }
 
@@ -1676,6 +1687,7 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
           upperColor: boll.hold !== null && boll.hold !== undefined ? "红色" : "绿色",
           lowerColor: boll.buy !== null && boll.buy !== undefined ? "红色" : "绿色",
           close: last ? last.close : null,
+          shortBuyDays: shortBuyDaysAt(source.values, index),
           gapUp: gapUpLabel(rows, index),
         };
         if (indicator === "ma") return { close: metrics.close, ma5: metrics.ma5, ma10: metrics.ma10, ma17: metrics.ma17, ma20: metrics.ma20, ma30: metrics.ma30, ma60: metrics.ma60, ma120: metrics.ma120, ma250: metrics.ma250, gapUp: metrics.gapUp };
