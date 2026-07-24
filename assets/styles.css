@@ -810,9 +810,7 @@ tbody tr:nth-child(even) {
 
 .manage-category-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(120px, 0.8fr) auto auto;
   gap: 8px;
-  align-items: start;
   padding: 8px;
   border: 1px solid #d8e1eb;
   border-radius: 6px;
@@ -822,8 +820,14 @@ tbody tr:nth-child(even) {
   font-weight: 700;
 }
 
+.manage-category-edit {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 8px;
+  align-items: center;
+}
+
 .manage-category-row details {
-  grid-column: 1 / -1;
   min-width: 0;
 }
 

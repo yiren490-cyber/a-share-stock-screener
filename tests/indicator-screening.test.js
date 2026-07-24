@@ -77,7 +77,7 @@ sandbox.window.localStorage = sandbox.localStorage;
 vm.createContext(sandbox);
 vm.runInContext(appSource, sandbox);
 
-const { collectIndicatorMetrics, defaultIndicatorPlan, evaluateIndicatorPlan, parseTencentQuote, quoteMatches, removeSymbolFromCategoryGroup, renameCategoryGroup, summarizeBacktestTrades } = sandbox.window.aShareAnalyzer;
+const { collectIndicatorMetrics, defaultIndicatorPlan, evaluateIndicatorPlan, formatCategoryStockLabel, parseTencentQuote, quoteMatches, removeSymbolFromCategoryGroup, renameCategoryGroup, summarizeBacktestTrades } = sandbox.window.aShareAnalyzer;
 
 assert.strictEqual(typeof evaluateIndicatorPlan, "function", "evaluateIndicatorPlan should be exported");
 assert.strictEqual(typeof parseTencentQuote, "function", "parseTencentQuote should be exported");
@@ -85,6 +85,7 @@ assert.strictEqual(typeof quoteMatches, "function", "quoteMatches should be expo
 assert.strictEqual(typeof summarizeBacktestTrades, "function", "summarizeBacktestTrades should be exported");
 assert.strictEqual(typeof renameCategoryGroup, "function", "category management should export renameCategoryGroup");
 assert.strictEqual(typeof removeSymbolFromCategoryGroup, "function", "category management should export removeSymbolFromCategoryGroup");
+assert.strictEqual(typeof formatCategoryStockLabel, "function", "category management should export formatCategoryStockLabel");
 
 function quoteLine(symbol, name, code) {
   const fields = Array.from({ length: 50 }, () => "");
@@ -294,10 +295,14 @@ assert.strictEqual(JSON.stringify(removeSymbolFromCategoryGroup({ A: ["sh600519"
   A: ["sz000001"],
   B: ["bj430047"],
 }));
+assert.strictEqual(formatCategoryStockLabel("sh600519", [], { sh600519: "贵州茅台" }), "贵州茅台 600519");
+assert.strictEqual(formatCategoryStockLabel("sz000001", [{ symbol: "sz000001", name: "平安银行", code: "000001" }], {}), "平安银行 000001");
 assert(appSource.includes("<details"), "managed categories should render collapsible details for stock lists");
 assert(appSource.includes("data-remove-category-symbol"), "managed category stock rows should include per-stock delete actions");
 assert(appSource.includes("data-rename-category"), "managed category rows should include rename actions");
-assert(/\.manage-category-row details\s*\{[^}]*grid-column:\s*1\s*\/\s*-1;/s.test(stylesSource), "expanded managed category stock list should use the full dialog width");
+assert(appSource.indexOf('class="manage-category-edit"') >= 0 && appSource.indexOf('class="manage-category-edit"') < appSource.indexOf("<details"), "managed category rename controls should render above the collapsible stock list");
+assert(/\.manage-category-edit\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\)\s*auto\s*auto;/s.test(stylesSource), "managed category rename controls should stay in the top edit row");
+assert(/\.manage-category-row\s*\{[^}]*display:\s*grid;[^}]*gap:\s*8px;/s.test(stylesSource), "managed category row should stack the edit row above the collapsible stock list");
 const managedCategoryStockSpanRule = stylesSource.match(/\.manage-category-stock span\s*\{[^}]*\}/);
 assert(managedCategoryStockSpanRule, "managed category stock label CSS rule should exist");
 assert(!/text-overflow:\s*ellipsis;/.test(managedCategoryStockSpanRule[0]), "managed category stock label should not truncate names and codes");

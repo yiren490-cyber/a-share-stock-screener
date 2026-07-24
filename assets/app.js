@@ -10,6 +10,7 @@
   const TODAY = new Date();
   const IS_MOBILE = typeof navigator !== "undefined" && /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || "");
   const STATIC_LISTING_DATES = window.A_SHARE_LISTING_DATES || {};
+  const QUOTE_NAME_CACHE_KEY = "stockWatchQuoteNames";
   const DEFAULT_POOL = [
     ["sh600000", "1999-11-10"],
     ["sh600519", "2001-08-27"],
@@ -225,6 +226,7 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
     categorySelectionMode: false,
     activeCategory: "",
     categories: JSON.parse(localStorage.getItem("aShareCategories") || "{}"),
+    quoteNameCache: readQuoteNameCache(localStorage),
     indicatorPlans: JSON.parse(localStorage.getItem("aShareIndicatorPlans") || "[]"),
     indicatorScreenBase: null,
     indicatorRunToken: 0,
@@ -1122,6 +1124,30 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
     };
   }
 
+  function readQuoteNameCache(storage) {
+    try {
+      const parsed = JSON.parse((storage && storage.getItem(QUOTE_NAME_CACHE_KEY)) || "{}");
+      return Object.fromEntries(
+        Object.entries(parsed || {})
+          .map(([symbol, name]) => [String(symbol || ""), String(name || "").trim()])
+          .filter(([symbol, name]) => /^(sh|sz|bj)\d{6}$/.test(symbol) && name)
+      );
+    } catch (_) {
+      return {};
+    }
+  }
+
+  function saveQuoteNameCache(storage, cache) {
+    storage.setItem(QUOTE_NAME_CACHE_KEY, JSON.stringify(cache || {}));
+  }
+
+  function rememberQuoteNames(quotes) {
+    (quotes || []).forEach((quote) => {
+      if (quote && /^(sh|sz|bj)\d{6}$/.test(quote.symbol || "") && quote.name) state.quoteNameCache[quote.symbol] = quote.name;
+    });
+    saveQuoteNameCache(localStorage, state.quoteNameCache);
+  }
+
   function gapUpLabel(rows, index) {
     if (index <= 0 || !rows[index] || !rows[index - 1]) return "否";
     return rows[index].low > rows[index - 1].high ? "是" : "否";
@@ -1358,9 +1384,15 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
     localStorage.setItem("aShareCategories", JSON.stringify(state.categories));
   }
 
+  function formatCategoryStockLabel(symbol, quotes, quoteNameCache) {
+    const code = String(symbol || "").slice(2);
+    const quote = (quotes || []).find((item) => item.symbol === symbol);
+    const name = (quote && quote.name) || (quoteNameCache && quoteNameCache[symbol]) || "";
+    return name ? `${name} ${code}` : code;
+  }
+
   function categoryStockLabel(symbol) {
-    const quote = state.quotes.find((item) => item.symbol === symbol);
-    return quote ? `${quote.name} ${quote.code}` : symbol.slice(2);
+    return formatCategoryStockLabel(symbol, state.quotes, state.quoteNameCache);
   }
 
   function renderManageCategoryList() {
@@ -1380,13 +1412,15 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
                   .join("")
               : `<p class="empty-note">空分组</p>`;
             return `<div class="manage-category-row">
-              <details>
-                <summary>${escapeHtml(name)}（${stocks.length}）</summary>
-                <div class="manage-category-stocks">${stockRows}</div>
-              </details>
+              <div class="manage-category-edit">
               <input type="text" value="${escapeHtml(name)}" data-category-rename-input />
               <button type="button" data-rename-category="${escapeHtml(name)}">保存名称</button>
               <button type="button" data-delete-category="${escapeHtml(name)}">删除分组</button>
+              </div>
+              <details>
+                <summary>股票列表（${stocks.length}）</summary>
+                <div class="manage-category-stocks">${stockRows}</div>
+              </details>
             </div>`;
           })
           .join("")
@@ -3992,6 +4026,7 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
       state.stockPool = await fetchAllStockPool();
       els.statusText.textContent = `已获取 ${state.stockPool.length} 只A股，正在分批拉取实时行情...`;
       state.quotes = await fetchQuotes();
+      rememberQuoteNames(state.quotes);
       state.selected = null;
       state.selectedRows = [];
       state.selectedIndexRows = [];
@@ -4253,6 +4288,6 @@ VAR12:=CLOSE/(1+(CLOSE/MA(CLOSE,240)-1)-MA(INDEXC/MA(INDEXC,240)-1,3));
   updateMaFilterLabel();
   bindEvents();
   renderQuoteTable();
-  window.aShareAnalyzer = { fetchQuotes, parseTencentQuote, quoteMatches, fetchKline, fetchKlineForPeriod, quotePassesIndicatorPlan, executeFormula, calculateMainForce, evaluateIndicatorPlan, collectIndicatorMetrics, summarizeBacktestTrades, renameCategoryGroup, removeSymbolFromCategoryGroup, defaultIndicatorPlan: DEFAULT_INDICATOR_PLAN, mainForceFormula: MAIN_FORCE_FORMULA, debugState: () => state };
+  window.aShareAnalyzer = { fetchQuotes, parseTencentQuote, quoteMatches, fetchKline, fetchKlineForPeriod, quotePassesIndicatorPlan, executeFormula, calculateMainForce, evaluateIndicatorPlan, collectIndicatorMetrics, summarizeBacktestTrades, renameCategoryGroup, removeSymbolFromCategoryGroup, formatCategoryStockLabel, defaultIndicatorPlan: DEFAULT_INDICATOR_PLAN, mainForceFormula: MAIN_FORCE_FORMULA, debugState: () => state };
 })();
 
