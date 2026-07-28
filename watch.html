@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>A股实时盯盘</title>
     <link rel="icon" href="data:," />
-    <link rel="stylesheet" href="assets/styles.css?v=20260724-category-list-names" />
+    <link rel="stylesheet" href="assets/styles.css?v=20260729-intraday-effect-toggle" />
   </head>
   <body class="watch-page">
     <main class="watch-shell">
@@ -50,6 +50,10 @@
         <select id="alertAudioSelect" aria-label="选择预警音频"></select>
         <button id="deleteAudioButton" type="button">删除音频</button>
         <span id="audioStatus">当前音频：默认提示音</span>
+        <label class="watch-effect-toggle">
+          <input id="intradayEffectsToggle" type="checkbox" checked />
+          <span>分时特效</span>
+        </label>
         <button id="watchRefreshButton" class="watch-realtime-button" type="button">实时刷新</button>
       </section>
 
@@ -121,7 +125,7 @@
     </main>
 
     <script src="assets/listing-dates.js"></script>
-    <script src="assets/watch.js?v=20260724-banner-category-admin"></script>
+    <script src="assets/watch.js?v=20260729-intraday-effect-toggle"></script>
     <script>
       window.stockWatch.initWatchPage(document);
     </script>

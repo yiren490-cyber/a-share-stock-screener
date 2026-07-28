@@ -32,6 +32,7 @@
   const QUOTE_NAME_CACHE_KEY = "stockWatchQuoteNames";
   const SELECTED_AUDIO_KEY = "stockWatchSelectedAudioId";
   const SOUND_ENABLED_KEY = "stockWatchSoundEnabled";
+  const INTRADAY_EFFECTS_ENABLED_KEY = "stockWatchIntradayEffectsEnabled";
   const STOCK_NOTES_KEY = "stockWatchNotes";
   const NOTE_TYPES = [
     { key: "watch", label: "盯盘笔记" },
@@ -205,6 +206,23 @@
   function saveSoundEnabled(storage, enabled) {
     try {
       if (storage) storage.setItem(SOUND_ENABLED_KEY, enabled ? "1" : "0");
+    } catch (_) {
+      // Storage can be unavailable in private contexts.
+    }
+  }
+
+  function readIntradayEffectsEnabled(storage) {
+    try {
+      const value = storage && storage.getItem(INTRADAY_EFFECTS_ENABLED_KEY);
+      return value === null || value === undefined ? true : value === "1";
+    } catch (_) {
+      return true;
+    }
+  }
+
+  function saveIntradayEffectsEnabled(storage, enabled) {
+    try {
+      if (storage) storage.setItem(INTRADAY_EFFECTS_ENABLED_KEY, enabled ? "1" : "0");
     } catch (_) {
       // Storage can be unavailable in private contexts.
     }
@@ -552,6 +570,7 @@
       openCategories: new Set(),
       previousAlertCount: 0,
       soundEnabled: readSoundEnabled(root.localStorage),
+      intradayEffectsEnabled: readIntradayEffectsEnabled(root.localStorage),
       uploadedAudioUrl: "",
       uploadedAudioObjectUrl: "",
       audioItems: [],
@@ -580,6 +599,7 @@
     renderBannerList(state, els);
     renderAudioPicker(state, els);
     renderSoundButton(state, els);
+    renderIntradayEffectsToggle(state, els);
     bindWatchEvents(state, els);
     state.audioReadyPromise = loadStoredAudio(state, els);
     const lastSymbol = normalizeSymbol(root.localStorage.getItem(LAST_SYMBOL_KEY) || "");
@@ -593,6 +613,7 @@
       searchHistory: doc.getElementById("watchSearchHistory"),
       loadButton: doc.getElementById("watchLoadButton"),
       refreshButton: doc.getElementById("watchRefreshButton"),
+      intradayEffectsToggle: doc.getElementById("intradayEffectsToggle"),
       prevButton: doc.getElementById("watchPrevButton"),
       nextButton: doc.getElementById("watchNextButton"),
       categoryList: doc.getElementById("watchCategoryList"),
@@ -638,6 +659,11 @@
       if (event.key === "Enter") loadFromInput(state, els);
     });
     els.refreshButton.addEventListener("click", () => toggleRealtimeRefresh(state, els));
+    if (els.intradayEffectsToggle) {
+      els.intradayEffectsToggle.addEventListener("change", () => {
+        setIntradayEffectsEnabled(state, els, els.intradayEffectsToggle.checked);
+      });
+    }
     els.prevButton.addEventListener("click", () => {
       const nav = makeCategoryNavigator(state.categories, state.categoryName, state.symbol);
       if (nav.previous) loadSymbol(state, els, nav.previous, state.categoryName);
@@ -1267,7 +1293,7 @@
         saveQuoteNameCache(root.localStorage, state.quoteNameCache);
       }
       renderQuote(state, els);
-      updateStopAlertLights(els, calculateStopWarningLevels(state.klineByPeriod.day || [], state.quote));
+      updateStopAlertLights(els, calculateStopWarningLevels(state.klineByPeriod.day || [], state.quote), state.intradayEffectsEnabled);
       if (state.quote && state.quote.name && state.quote.name !== previousName) renderCategories(state, els);
       const now = Date.now();
       if (now - state.lastStatusAt > 5000) {
@@ -1961,7 +1987,7 @@
       const node = els.alertLights.querySelector(`[data-alert="${key}"]`);
       if (node) node.classList.toggle("is-on", active);
     });
-    updateStopAlertLights(els, calculateStopWarningLevels(day, state.quote));
+    updateStopAlertLights(els, calculateStopWarningLevels(day, state.quote), state.intradayEffectsEnabled);
     if (result.count >= 2) {
       startAlertLoop(state);
     } else {
@@ -1971,7 +1997,7 @@
     updateAlertBanner(state, els);
   }
 
-  function updateStopAlertLights(els, levels) {
+  function updateStopAlertLights(els, levels, intradayEffectsEnabled = true) {
     const items = [
       ["warningPrice", "预警价格", levels.warningPrice, levels.warningPriceActive],
       ["ma5", "5日均价", levels.ma5, levels.ma5Active],
@@ -1986,11 +2012,26 @@
       if (text) text.textContent = `${label}：${formatNumber(value)}`;
     });
     const riskLevel = calculateStopRiskLevel(levels);
+    applyStopRiskLevel(els, riskLevel, intradayEffectsEnabled);
+  }
+
+  function applyStopRiskLevel(els, riskLevel, intradayEffectsEnabled = true) {
     const card = els.intradayCard || (els.intradayChart && els.intradayChart.closest && els.intradayChart.closest(".watch-intraday-card"));
     if (card && card.classList) {
       ["stop-risk-0", "stop-risk-1", "stop-risk-2", "stop-risk-3", "stop-risk-4"].forEach((name) => card.classList.remove(name));
-      card.classList.add(`stop-risk-${riskLevel}`);
+      if (intradayEffectsEnabled) card.classList.add(`stop-risk-${riskLevel}`);
     }
+  }
+
+  function renderIntradayEffectsToggle(state, els) {
+    if (els.intradayEffectsToggle) els.intradayEffectsToggle.checked = Boolean(state.intradayEffectsEnabled);
+  }
+
+  function setIntradayEffectsEnabled(state, els, enabled) {
+    state.intradayEffectsEnabled = Boolean(enabled);
+    saveIntradayEffectsEnabled(root.localStorage, state.intradayEffectsEnabled);
+    renderIntradayEffectsToggle(state, els);
+    updateStopAlertLights(els, calculateStopWarningLevels(state.klineByPeriod.day || [], state.quote), state.intradayEffectsEnabled);
   }
 
   async function setSoundEnabled(state, els, enabled) {
@@ -2286,6 +2327,9 @@
     renderKlineInfo,
     readSoundEnabled,
     saveSoundEnabled,
+    readIntradayEffectsEnabled,
+    saveIntradayEffectsEnabled,
+    applyStopRiskLevel,
     normalizeSearchHistory,
     readSearchHistory,
     addSearchHistory,

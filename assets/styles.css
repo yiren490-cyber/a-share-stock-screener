@@ -1446,8 +1446,25 @@ svg {
   padding: 10px 14px;
 }
 
-.watch-realtime-button {
+.watch-effect-toggle {
   margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.watch-effect-toggle input {
+  width: 16px;
+  height: 16px;
+  accent-color: #dc2626;
+}
+
+.watch-realtime-button {
   min-width: 118px;
   background: #dc2626;
   border-color: #dc2626;
@@ -2399,6 +2416,10 @@ svg {
 
   .watch-realtime-button {
     width: 100%;
+  }
+
+  .watch-effect-toggle {
+    justify-content: center;
     margin-left: 0;
   }
 

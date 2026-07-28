@@ -15,6 +15,7 @@ assert.strictEqual(watch.normalizeSymbol(" bad "), "");
 assert(/<script src="assets\/watch\.js\?v=[^"]+"><\/script>/.test(watchHtml), "watch page should version watch.js so browsers do not keep stale intraday code");
 assert(/<link rel="stylesheet" href="assets\/styles\.css\?v=[^"]+" \/>/.test(watchHtml), "watch page should version styles.css so browsers do not keep stale dialog styles");
 assert(watchHtml.includes('data-alert="intradayBlue"'), "watch page should show an intraday deep-blue alert light");
+assert(watchHtml.includes('id="intradayEffectsToggle"'), "watch page should include a switch for intraday risk effects");
 assert(watchSource.includes("function renderNotesPreview"), "notes hover preview should exist");
 assert(watchSource.includes("function renderNotesEditor"), "notes click editor should exist");
 assert(/data-note-type-select/.test(watchSource), "notes editor should have a category selector");
@@ -34,6 +35,11 @@ assert.strictEqual(watch.readSoundEnabled({ getItem: (key) => (key === "stockWat
 const savedSound = {};
 watch.saveSoundEnabled({ setItem(key, value) { savedSound[key] = value; } }, true);
 assert.strictEqual(savedSound.stockWatchSoundEnabled, "1");
+assert.strictEqual(watch.readIntradayEffectsEnabled({ getItem: () => null }), true, "intraday risk effects should default on");
+assert.strictEqual(watch.readIntradayEffectsEnabled({ getItem: (key) => (key === "stockWatchIntradayEffectsEnabled" ? "0" : null) }), false);
+const savedIntradayEffects = {};
+watch.saveIntradayEffectsEnabled({ setItem(key, value) { savedIntradayEffects[key] = value; } }, false);
+assert.strictEqual(savedIntradayEffects.stockWatchIntradayEffectsEnabled, "0");
 
 function quoteLine(symbol, name, code) {
   const fields = Array.from({ length: 50 }, () => "");
@@ -155,6 +161,22 @@ assert.strictEqual(
 );
 assert.strictEqual(watch.calculateStopRiskLevel({}), 0, "missing stop warning states should not raise the risk level");
 assert(watchSource.includes("stop-risk-${riskLevel}"), "intraday card should receive a stop-risk level class");
+assert(watchSource.includes("intradayEffectsEnabled"), "intraday card risk effect should be controlled by state");
+const riskClasses = new Set(["stop-risk-2"]);
+const fakeRiskCard = {
+  classList: {
+    add(name) {
+      riskClasses.add(name);
+    },
+    remove(name) {
+      riskClasses.delete(name);
+    },
+  },
+};
+watch.applyStopRiskLevel({ intradayCard: fakeRiskCard }, 4, false);
+assert.deepStrictEqual([...riskClasses], [], "disabled intraday effects should remove risk classes without adding a new one");
+watch.applyStopRiskLevel({ intradayCard: fakeRiskCard }, 3, true);
+assert.deepStrictEqual([...riskClasses], ["stop-risk-3"], "enabled intraday effects should add the current risk class");
 assert(/\.watch-intraday-card\.stop-risk-4::after/.test(stylesSource), "highest stop risk level should add a subtle weather effect");
 assert(/\.watch-intraday-card\.stop-risk-1\s*\{[\s\S]*?box-shadow:\s*0 0 0 1px rgba\(248, 113, 113, 0\.65\)/.test(stylesSource), "first stop risk level should already look like a danger warning");
 assert(/\.watch-intraday-card\.stop-risk-2\s*\{[\s\S]*?box-shadow:\s*0 0 0 2px rgba\(239, 68, 68, 0\.65\)/.test(stylesSource), "second stop risk level should have a stronger danger frame");
