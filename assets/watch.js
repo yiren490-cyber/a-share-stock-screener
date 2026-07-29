@@ -10,17 +10,22 @@
     "https://ifzq.gtimg.cn/appstock/app/fqkline/get",
   ];
   const TENCENT_MINUTE_KLINE_URL = "https://ifzq.gtimg.cn/appstock/app/kline/mkline";
-  const PERIODS = ["m1", "m5", "m30", "m60"];
+  const PANEL_SLOTS = ["slot0", "slot1", "slot2", "slot3"];
+  const DEFAULT_PANEL_PERIODS = ["m5", "m15", "m30", "day"];
+  const PERIOD_OPTIONS = ["m1", "m5", "m15", "m30", "m60", "day"];
   const PERIOD_META = {
     m1: { label: "1分钟", klt: "1", bars: 120 },
     m5: { label: "5分钟", klt: "5", bars: 120 },
+    m15: { label: "15分钟", klt: "15", bars: 120 },
     m30: { label: "30分钟", klt: "30", bars: 120 },
     m60: { label: "60分钟", klt: "60", bars: 120 },
     day: { label: "日K", klt: "day", bars: 120 },
   };
-  const ALERT_PERIODS = ["day"];
+  const ALERT_PERIODS = ["m1", "m5", "day"];
   const SUBCHARTS = ["volume", "macd", "kdj"];
   const SUBCHART_LABELS = { volume: "成交量", macd: "MACD", kdj: "KDJ" };
+  const MA_PERIODS = [5, 10, 17, 20, 60];
+  const MA_COLORS = ["#1d4ed8", "#f59e0b", "#7c3aed", "#0f766e", "#dc2626"];
   const PANEL_STORAGE_KEY = "stockWatchPanelSettings";
   const LAST_SYMBOL_KEY = "stockWatchLastSymbol";
   const LAST_CATEGORY_KEY = "stockWatchLastCategory";
@@ -90,8 +95,17 @@
     };
   }
 
+  function normalizePanelPeriod(value, fallback = "m5") {
+    return PERIOD_OPTIONS.includes(value) ? value : fallback;
+  }
+
   function defaultPanelSettings() {
-    return Object.fromEntries(PERIODS.map((period) => [period, { mainMode: "ma", subcharts: [...SUBCHARTS] }]));
+    return Object.fromEntries(
+      PANEL_SLOTS.map((slot, index) => [
+        slot,
+        { period: DEFAULT_PANEL_PERIODS[index], mainMode: "ma", subcharts: [...SUBCHARTS] },
+      ])
+    );
   }
 
   function normalizeSubcharts(value) {
@@ -102,9 +116,11 @@
 
   function mergePanelSettings(saved) {
     const defaults = defaultPanelSettings();
-    PERIODS.forEach((period) => {
-      const item = saved && saved[period] ? saved[period] : {};
-      defaults[period] = {
+    PANEL_SLOTS.forEach((slot, index) => {
+      const fallbackPeriod = DEFAULT_PANEL_PERIODS[index];
+      const item = saved && saved[slot] ? saved[slot] : (saved && saved[fallbackPeriod]) || {};
+      defaults[slot] = {
+        period: normalizePanelPeriod(item.period, fallbackPeriod),
         mainMode: item.mainMode === "boll" ? "boll" : "ma",
         subcharts: normalizeSubcharts(item.subcharts),
       };
@@ -1311,7 +1327,7 @@
     if (state.klineLoading) return;
     state.klineLoading = true;
     try {
-      const periods = [...PERIODS, ...ALERT_PERIODS];
+      const periods = [...new Set([...activePanelPeriods(state), ...ALERT_PERIODS])];
       const results = await Promise.allSettled(periods.map(async (period) => [period, await fetchKline(state.symbol, period)]));
       results.forEach((result) => {
         if (result.status === "fulfilled") {
@@ -1390,7 +1406,7 @@
   }
 
   async function fetchTencentKline(symbol, period) {
-    if (period === "m1" || period === "m5" || period === "m30" || period === "m60") return fetchTencentMinuteKline(symbol, period);
+    if (String(period).startsWith("m")) return fetchTencentMinuteKline(symbol, period);
     return fetchTencentDayKline(symbol);
   }
 
@@ -1529,10 +1545,20 @@
 
   function renderPeriodPanels(state, els) {
     els.periodPanels.className = `watch-period-grid is-zoom-${state.visibleBars}`;
-    els.periodPanels.innerHTML = PERIODS.map((period) => panelMarkup(period, state.panelSettings[period])).join("");
+    els.periodPanels.innerHTML = PANEL_SLOTS.map((slot) => panelMarkup(slot, state.panelSettings[slot])).join("");
+    els.periodPanels.querySelectorAll("[data-panel-period]").forEach((select) => {
+      select.addEventListener("change", () => {
+        const slot = select.dataset.panelSlot;
+        const period = normalizePanelPeriod(select.value, DEFAULT_PANEL_PERIODS[PANEL_SLOTS.indexOf(slot)] || "m5");
+        state.panelSettings[slot].period = period;
+        savePanelSettings(state);
+        renderPeriodPanels(state, els);
+        loadPanelPeriodIfNeeded(state, els, period);
+      });
+    });
     els.periodPanels.querySelectorAll("[data-main-mode]").forEach((select) => {
       select.addEventListener("change", () => {
-        state.panelSettings[select.dataset.period].mainMode = select.value;
+        state.panelSettings[select.dataset.panelSlot].mainMode = select.value;
         savePanelSettings(state);
         renderPeriodPanels(state, els);
         updateAlerts(state, els);
@@ -1540,22 +1566,24 @@
     });
     els.periodPanels.querySelectorAll("[data-subchart-index]").forEach((select) => {
       select.addEventListener("change", () => {
-        const period = select.dataset.period;
+        const slot = select.dataset.panelSlot;
         const index = Number(select.dataset.subchartIndex);
-        const current = [...state.panelSettings[period].subcharts];
+        const current = [...state.panelSettings[slot].subcharts];
         const oldValue = current[index];
         const duplicateIndex = current.indexOf(select.value);
         if (duplicateIndex >= 0 && duplicateIndex !== index) current[duplicateIndex] = oldValue;
         current[index] = select.value;
-        state.panelSettings[period].subcharts = normalizeSubcharts(current);
+        state.panelSettings[slot].subcharts = normalizeSubcharts(current);
         savePanelSettings(state);
         renderPeriodPanels(state, els);
       });
     });
-    PERIODS.forEach((period) => {
-      const panel = els.periodPanels.querySelector(`[data-period-panel="${period}"]`);
+    PANEL_SLOTS.forEach((slot) => {
+      const settings = state.panelSettings[slot];
+      const period = settings.period;
+      const panel = els.periodPanels.querySelector(`[data-period-panel="${slot}"]`);
       const rows = state.klineByPeriod[period] || [];
-      renderPeriodPanelCharts(panel, rows, state.panelSettings[period], state.visibleBars, state.hoverDate);
+      renderPeriodPanelCharts(panel, rows, settings, state.visibleBars, state.hoverDate);
     });
   }
 
@@ -1565,22 +1593,28 @@
       return;
     }
     els.periodPanels.className = `watch-period-grid is-zoom-${state.visibleBars}`;
-    PERIODS.forEach((period) => {
-      const panel = els.periodPanels.querySelector(`[data-period-panel="${period}"]`);
+    PANEL_SLOTS.forEach((slot) => {
+      const settings = state.panelSettings[slot];
+      const period = settings.period;
+      const panel = els.periodPanels.querySelector(`[data-period-panel="${slot}"]`);
       const rows = state.klineByPeriod[period] || [];
-      renderPeriodPanelCharts(panel, rows, state.panelSettings[period], state.visibleBars, state.hoverDate);
+      renderPeriodPanelCharts(panel, rows, settings, state.visibleBars, state.hoverDate);
     });
   }
 
-  function panelMarkup(period, settings) {
+  function panelMarkup(slot, settings) {
+    const period = normalizePanelPeriod(settings.period);
     const meta = PERIOD_META[period];
     const subcharts = settings.subcharts
-      .map((type, index) => `<div class="watch-subchart"><select data-period="${period}" data-subchart-index="${index}">${SUBCHARTS.map((item) => `<option value="${item}" ${item === type ? "selected" : ""}>${SUBCHART_LABELS[item]}</option>`).join("")}</select><svg data-subchart-svg="${index}" role="img" aria-label="${SUBCHART_LABELS[type]}"></svg></div>`)
+      .map((type, index) => `<div class="watch-subchart"><select data-panel-slot="${slot}" data-subchart-index="${index}">${SUBCHARTS.map((item) => `<option value="${item}" ${item === type ? "selected" : ""}>${SUBCHART_LABELS[item]}</option>`).join("")}</select><svg data-subchart-svg="${index}" role="img" aria-label="${SUBCHART_LABELS[type]}"></svg></div>`)
       .join("");
-    return `<section class="watch-period-panel" data-period-panel="${period}">
+    const periodOptions = PERIOD_OPTIONS.map((item) => `<option value="${item}" ${item === period ? "selected" : ""}>${PERIOD_META[item].label}</option>`).join("");
+    return `<section class="watch-period-panel" data-period-panel="${slot}">
       <div class="watch-period-header">
-        <h3>${meta.label}</h3>
-        <select data-main-mode data-period="${period}">
+        <select data-panel-period data-panel-slot="${slot}" aria-label="选择周期">
+          ${periodOptions}
+        </select>
+        <select data-main-mode data-panel-slot="${slot}">
           <option value="ma" ${settings.mainMode === "ma" ? "selected" : ""}>K线+均线</option>
           <option value="boll" ${settings.mainMode === "boll" ? "selected" : ""}>K线+BOLL</option>
         </select>
@@ -1589,6 +1623,21 @@
       <svg class="watch-main-svg" data-main-svg role="img" aria-label="${meta.label}主图"></svg>
       <div class="watch-subchart-grid">${subcharts}</div>
     </section>`;
+  }
+
+  function activePanelPeriods(state) {
+    return PANEL_SLOTS.map((slot, index) => normalizePanelPeriod(state.panelSettings[slot] && state.panelSettings[slot].period, DEFAULT_PANEL_PERIODS[index]));
+  }
+
+  async function loadPanelPeriodIfNeeded(state, els, period) {
+    if (!state.symbol || state.klineByPeriod[period]) return;
+    try {
+      state.klineByPeriod[period] = await fetchKline(state.symbol, period);
+      updatePeriodPanelCharts(state, els);
+      updateAlerts(state, els);
+    } catch (error) {
+      setStatus(els, `${PERIOD_META[period].label}数据加载失败`);
+    }
   }
 
   function renderPeriodPanelCharts(panel, allRows, settings, visibleBars, hoverDate) {
@@ -1811,9 +1860,13 @@
     return 132;
   }
 
-  function renderKlineInfo(row) {
+  function renderKlineInfo(row, maValues = null) {
     if (!row) return "等待数据";
-    return `${row.date}  收:${formatNumber(row.close)}  开:${formatNumber(row.open)}  低:${formatNumber(row.low)}  高:${formatNumber(row.high)}`;
+    const base = `${row.date}  收:${formatNumber(row.close)}  开:${formatNumber(row.open)}  低:${formatNumber(row.low)}  高:${formatNumber(row.high)}`;
+    const maText = maValues
+      ? `  ${MA_PERIODS.map((period) => `MA${period}:${formatNumber(maValues[period])}`).join("  ")}`
+      : "";
+    return `${base}${maText}`;
   }
 
   function drawKlineChart(svg, rows, mode, info, hoverDate, visibleBars) {
@@ -1829,9 +1882,8 @@
       return;
     }
     const boll = calculateBoll(rows);
-    const ma5 = movingAverage(rows, 5);
-    const ma10 = movingAverage(rows, 10);
-    const extras = mode === "boll" ? boll.flatMap((item) => [item.ub, item.boll, item.lb]) : [...ma5, ...ma10];
+    const maByPeriod = new Map(MA_PERIODS.map((period) => [period, movingAverage(rows, period)]));
+    const extras = mode === "boll" ? boll.flatMap((item) => [item.ub, item.boll, item.lb]) : [...maByPeriod.values()].flat();
     const scale = chartScale(rows.flatMap((row) => [row.high, row.low]).concat(extras), pad.top, h - pad.bottom);
     const candleW = Math.max(2, (w - pad.left - pad.right) / rows.length - 2);
     const candles = rows
@@ -1850,8 +1902,7 @@
         ? `<path d="${seriesPath(boll.map((item) => item.ub), scale.y, pad.left, w - pad.right)}" fill="none" stroke="#7c3aed" stroke-width="1.1" />
            <path d="${seriesPath(boll.map((item) => item.boll), scale.y, pad.left, w - pad.right)}" fill="none" stroke="#111827" stroke-width="1" />
            <path d="${seriesPath(boll.map((item) => item.lb), scale.y, pad.left, w - pad.right)}" fill="none" stroke="#7c3aed" stroke-width="1.1" />`
-        : `<path d="${seriesPath(ma5, scale.y, pad.left, w - pad.right)}" fill="none" stroke="#1d4ed8" stroke-width="1.2" />
-           <path d="${seriesPath(ma10, scale.y, pad.left, w - pad.right)}" fill="none" stroke="#f59e0b" stroke-width="1.2" />`;
+        : MA_PERIODS.map((period, index) => `<path d="${seriesPath(maByPeriod.get(period), scale.y, pad.left, w - pad.right)}" fill="none" stroke="${MA_COLORS[index]}" stroke-width="1.2" />`).join("");
     const hoverIndex = nearestIndexForDate(rows, hoverDate);
     const hoverRow = hoverIndex >= 0 ? rows[hoverIndex] : rows[rows.length - 1];
     const hoverX = hoverIndex >= 0 ? xAt(hoverIndex, rows.length, pad.left, w - pad.right) : null;
@@ -1866,7 +1917,13 @@
       ${candles}${overlays}${crosshair}
       <text x="2" y="${pad.top + 8}" fill="#64748b" font-size="9">${scale.max.toFixed(2)}</text>
       <text x="2" y="${h - pad.bottom}" fill="#64748b" font-size="9">${scale.min.toFixed(2)}</text>`;
-    if (info) info.textContent = renderKlineInfo(hoverRow || rows[rows.length - 1]);
+    if (info) {
+      const maValues =
+        mode === "ma" && hoverIndex >= 0
+          ? Object.fromEntries(MA_PERIODS.map((period) => [period, maByPeriod.get(period)[hoverIndex]]))
+          : null;
+      info.textContent = renderKlineInfo(hoverRow || rows[rows.length - 1], maValues);
+    }
   }
 
   function drawVolumeChart(svg, rows, hoverDate, visibleBars) {
@@ -2325,6 +2382,7 @@
     renderOrderBookHtml,
     renderIntradayInfoHtml,
     renderKlineInfo,
+    eastmoneyKlt,
     readSoundEnabled,
     saveSoundEnabled,
     readIntradayEffectsEnabled,
