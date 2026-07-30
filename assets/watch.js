@@ -2318,6 +2318,10 @@
       state.hoverDate = row.date;
       renderIntraday(state, els);
       updatePeriodPanelCharts(state, els);
+    }, () => {
+      state.hoverDate = "";
+      renderIntraday(state, els);
+      updatePeriodPanelCharts(state, els);
     });
   }
 
@@ -2505,7 +2509,7 @@
       .map(Number);
   }
 
-  function drawIntradayChart(svg, rows, info, quote, hoverDate, onHover) {
+  function drawIntradayChart(svg, rows, info, quote, hoverDate, onHover, onLeave) {
     if (!svg) return;
     const { w, h, pad, priceBottom, volumeTop, volumeHeight } = intradayLayout();
     if (!rows.length) {
@@ -2576,11 +2580,12 @@
       .join("");
     svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
     svg.setAttribute("preserveAspectRatio", "none");
-    const explicitHoverSlotRaw = minuteToTradingSlot(hoverDate);
+    const hasHover = Boolean(hoverDate);
+    const explicitHoverSlotRaw = hasHover ? minuteToTradingSlot(hoverDate) : null;
     const explicitHoverSlot = explicitHoverSlotRaw === null ? null : clampSlotToDataRange(explicitHoverSlotRaw, plotted);
-    const hoverIndex = hoverDate ? nearestIndexForDate(plotted, hoverDate) : plotted.length - 1;
+    const hoverIndex = hasHover ? nearestIndexForDate(plotted, hoverDate) : plotted.length - 1;
     const hoverRow = hoverIndex >= 0 ? plotted[hoverIndex] : plotted[plotted.length - 1];
-    const hoverSlot = explicitHoverSlot !== null ? explicitHoverSlot : hoverRow && hoverRow.slot;
+    const hoverSlot = hasHover ? (explicitHoverSlot !== null ? explicitHoverSlot : hoverRow && hoverRow.slot) : null;
     const hoverAverage = hoverIndex >= 0 && averageRows[hoverIndex] ? averageRows[hoverIndex].value : lastAverage;
     const hoverPct = quote && quote.prevClose && hoverRow ? ((hoverRow.close - quote.prevClose) / quote.prevClose) * 100 : null;
     const crosshair =
@@ -2626,6 +2631,9 @@
         const slot = clampSlotToDataRange(rawSlot, plotted);
         const nearest = plotted.reduce((best, row) => (Math.abs(row.slot - slot) < Math.abs(best.slot - slot) ? row : best), plotted[0]);
         if (nearest) onHover({ ...nearest, date: `${nearest.date.slice(0, 10)} ${slotToTradingTime(slot)}` });
+      };
+      svg.onmouseleave = () => {
+        if (typeof onLeave === "function") onLeave();
       };
     }
   }
@@ -2681,11 +2689,12 @@
            <path d="${seriesPath(boll.map((item) => item.boll), scale.y, pad.left, w - pad.right)}" fill="none" stroke="#111827" stroke-width="1" />
            <path d="${seriesPath(boll.map((item) => item.lb), scale.y, pad.left, w - pad.right)}" fill="none" stroke="#7c3aed" stroke-width="1.1" />`
         : MA_PERIODS.map((period, index) => `<path d="${seriesPath(maByPeriod.get(period), scale.y, pad.left, w - pad.right)}" fill="none" stroke="${MA_COLORS[index]}" stroke-width="1.2" />`).join("");
-    const hoverIndex = hoverDate ? nearestIndexForDate(rows, hoverDate) : rows.length - 1;
+    const hasHover = Boolean(hoverDate);
+    const hoverIndex = hasHover ? nearestIndexForDate(rows, hoverDate) : rows.length - 1;
     const hoverRow = hoverIndex >= 0 ? rows[hoverIndex] : rows[rows.length - 1];
     const hoverX = hoverIndex >= 0 ? xAt(hoverIndex, rows.length, pad.left, w - pad.right) : null;
     const crosshair =
-      hoverX !== null
+      hasHover && hoverX !== null
         ? `<line class="watch-crosshair" x1="${hoverX}" y1="${pad.top}" x2="${hoverX}" y2="${h - pad.bottom}" />
            <line class="watch-crosshair" x1="${pad.left}" y1="${scale.y(hoverRow.close)}" x2="${w - pad.right}" y2="${scale.y(hoverRow.close)}" />`
         : "";
@@ -2728,7 +2737,8 @@
     const scale = chartScale(values.flatMap((item) => [item.k, item.d, item.j, 20, 80]), pad.top, h - pad.bottom);
     svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
     svg.setAttribute("preserveAspectRatio", "none");
-    const hoverIndex = nearestIndexForDate(rows, hoverDate);
+    const hasHover = Boolean(hoverDate);
+    const hoverIndex = hasHover ? nearestIndexForDate(rows, hoverDate) : -1;
     const hoverX = hoverIndex >= 0 ? xAt(hoverIndex, rows.length, pad.left, w - pad.right) : null;
     svg.innerHTML = `<rect width="${w}" height="${h}" fill="#fff" />
       <line x1="${pad.left}" y1="${scale.y(80)}" x2="${w - pad.right}" y2="${scale.y(80)}" stroke="#fecaca" />
@@ -2764,7 +2774,8 @@
         return `<rect x="${x - barW / 2}" y="${h - pad.bottom - barH}" width="${barW}" height="${barH}" fill="${color}" opacity="0.7" />`;
       })
       .join("");
-    const hoverIndex = nearestIndexForDate(rows, hoverDate);
+    const hasHover = Boolean(hoverDate);
+    const hoverIndex = hasHover ? nearestIndexForDate(rows, hoverDate) : -1;
     const hoverX = hoverIndex >= 0 ? xAt(hoverIndex, rows.length, pad.left, w - pad.right) : null;
     svg.innerHTML = `<rect width="${w}" height="${h}" fill="#fff" />${bars}${hoverX !== null ? `<line class="watch-crosshair" x1="${hoverX}" y1="${pad.top}" x2="${hoverX}" y2="${h - pad.bottom}" />` : ""}`;
   }
@@ -2797,7 +2808,8 @@
     const lines = (options.lines || [])
       .map((line) => `<path d="${seriesPath(line.values || [], scale.y, pad.left, w - pad.right)}" fill="none" stroke="${line.color}" stroke-width="1" />`)
       .join("");
-    const hoverIndex = nearestIndexForDate(rows, hoverDate);
+    const hasHover = Boolean(hoverDate);
+    const hoverIndex = hasHover ? nearestIndexForDate(rows, hoverDate) : -1;
     const hoverX = hoverIndex >= 0 ? xAt(hoverIndex, values.length, pad.left, w - pad.right) : null;
     svg.innerHTML = `<rect width="${w}" height="${h}" fill="#fff" /><line x1="${pad.left}" y1="${zero}" x2="${w - pad.right}" y2="${zero}" stroke="#dfe5ec" />${bars}${lines}${hoverX !== null ? `<line class="watch-crosshair" x1="${hoverX}" y1="${pad.top}" x2="${hoverX}" y2="${h - pad.bottom}" />` : ""}`;
   }
@@ -3193,6 +3205,9 @@
     calculateIntradayTrendStates,
     drawIntradayChart,
     drawKlineChart,
+    drawVolumeChart,
+    drawMacdChart,
+    drawKdjChart,
     positionNotesDialogAtPageLeft,
     mergeAudioItems,
     hasStoredAlertAudio,
