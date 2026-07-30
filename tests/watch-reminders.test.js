@@ -4,6 +4,7 @@ const path = require("path");
 
 const watch = require("../assets/watch.js");
 const watchHtml = fs.readFileSync(path.join(__dirname, "..", "watch.html"), "utf8");
+const watchCss = fs.readFileSync(path.join(__dirname, "..", "assets", "styles.css"), "utf8");
 
 assert(watchHtml.includes('id="watchReminderButton"'), "watch page should place reminder management where realtime refresh was");
 assert(!watchHtml.includes('id="watchRefreshButton"'), "watch page should remove the manual realtime refresh toggle");
@@ -19,6 +20,9 @@ assert.deepStrictEqual(watch.reminderFormConfigForType("price").fields, ["priceD
 assert.deepStrictEqual(watch.reminderFormConfigForType("range").fields, ["priceRange"]);
 assert.deepStrictEqual(watch.reminderFormConfigForType("ma").fields, ["maDirection", "maPeriod"]);
 assert.deepStrictEqual(watch.reminderFormConfigForType("boll").fields, ["bollDirection", "bollLine"]);
+assert(watchCss.includes(".watch-reminder-section[hidden]"), "hidden reminder tab panels must not be forced visible by grid styles");
+assert(watchCss.includes("grid-template-columns: 1fr auto 1fr"), "watch reminder tabs should be centered with the add button on the right");
+assert.strictEqual(watch.normalizeSymbol("国睿科技 600562"), "sh600562", "reminder stock input should accept name plus code display text");
 
 const normalized = watch.normalizeReminderRules([
   { symbol: "600519", conditionType: "priceAbove", targetPrice: "10.5" },

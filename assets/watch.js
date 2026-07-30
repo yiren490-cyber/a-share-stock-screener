@@ -65,10 +65,11 @@
     const text = String(input || "").trim().toLowerCase();
     const full = text.match(/^(sh|sz|bj)(\d{6})$/);
     if (full) return `${full[1]}${full[2]}`;
-    if (!/^\d{6}$/.test(text)) return "";
-    if (text.startsWith("6")) return `sh${text}`;
-    if (text.startsWith("4") || text.startsWith("8") || text.startsWith("9")) return `bj${text}`;
-    return `sz${text}`;
+    const code = /^\d{6}$/.test(text) ? text : (text.match(/(?:^|\D)(\d{6})(?:\D|$)/) || [])[1] || "";
+    if (!code) return "";
+    if (code.startsWith("6")) return `sh${code}`;
+    if (code.startsWith("4") || code.startsWith("8") || code.startsWith("9")) return `bj${code}`;
+    return `sz${code}`;
   }
 
   function readCategories(storage) {
@@ -1153,8 +1154,11 @@
     setReminderTab(state, els, state.reminderActiveTab);
   }
 
-  function reminderStockLabel(rule) {
-    return `${rule.symbol.slice(2)} ${PERIOD_META[rule.period] ? PERIOD_META[rule.period].label : ""}`.trim();
+  function reminderStockLabel(state, rule) {
+    const code = rule.symbol.slice(2);
+    const name = (state.quoteNameCache && state.quoteNameCache[rule.symbol]) || "";
+    const period = PERIOD_META[rule.period] ? PERIOD_META[rule.period].label : "";
+    return `${name ? `${name} ` : ""}${code} ${period}`.trim();
   }
 
   function renderReminderRules(state, els) {
@@ -1163,16 +1167,8 @@
     els.reminderRulesList.innerHTML = rules.length
       ? rules
           .map(
-            (rule) => `<article class="watch-reminder-rule">
-              <div class="watch-reminder-rule-head">
-                <strong>${escapeHtml(reminderStockLabel(rule))}</strong>
-                <div class="watch-reminder-rule-actions">
-                  <label><input type="checkbox" data-reminder-enabled="${escapeHtml(rule.id)}" ${rule.enabled ? "checked" : ""} /> 启用</label>
-                  <button type="button" data-delete-reminder-rule="${escapeHtml(rule.id)}">删除规则</button>
-                </div>
-              </div>
-              <span>${escapeHtml(reminderConditionText(rule))}</span>
-            </article>`
+            (rule) =>
+              `<article class="watch-reminder-rule"><strong>${escapeHtml(reminderStockLabel(state, rule))}</strong><span>${escapeHtml(reminderConditionText(rule))}</span><div class="watch-reminder-rule-actions"><label><input type="checkbox" data-reminder-enabled="${escapeHtml(rule.id)}" ${rule.enabled ? "checked" : ""} /> 启用</label><button type="button" data-delete-reminder-rule="${escapeHtml(rule.id)}">删除规则</button></div></article>`
           )
           .join("")
       : '<p class="empty-note">暂无提醒规则</p>';
@@ -1210,7 +1206,10 @@
   }
 
   function openAddReminderModal(state, els) {
-    if (els.reminderSymbolInput && state.symbol) els.reminderSymbolInput.value = state.symbol;
+    if (els.reminderSymbolInput && state.symbol) {
+      const name = (state.quote && state.quote.symbol === state.symbol && state.quote.name) || (state.quoteNameCache && state.quoteNameCache[state.symbol]) || "";
+      els.reminderSymbolInput.value = `${name ? `${name} ` : ""}${state.symbol.slice(2)}`;
+    }
     renderReminderFormFields(els);
     if (els.addReminderModal) els.addReminderModal.hidden = false;
   }
