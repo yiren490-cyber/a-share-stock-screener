@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>A股实时盯盘</title>
     <link rel="icon" href="data:," />
-    <link rel="stylesheet" href="assets/styles.css?v=20260731-kline-ma-colors" />
+    <link rel="stylesheet" href="assets/styles.css?v=20260731-reminders" />
   </head>
   <body class="watch-page">
     <main class="watch-shell">
@@ -54,7 +54,7 @@
           <input id="intradayEffectsToggle" type="checkbox" checked />
           <span>分时特效</span>
         </label>
-        <button id="watchRefreshButton" class="watch-realtime-button" type="button">实时刷新</button>
+        <button id="watchReminderButton" class="watch-reminder-button" type="button">提醒管理（0）</button>
       </section>
 
       <div id="watchBannerModal" class="watch-banner-modal" hidden>
@@ -83,6 +83,7 @@
         </aside>
 
         <section class="watch-realtime-panel">
+          <div id="watchReminderToasts" class="watch-reminder-toasts" aria-live="polite"></div>
           <div class="watch-section-header">
             <div>
               <div class="watch-title-row">
@@ -157,6 +158,93 @@
         </div>
       </div>
 
+      <div class="modal-backdrop" id="watchReminderModal" hidden>
+        <div class="watch-reminder-modal" role="dialog" aria-modal="true" aria-label="提醒管理">
+          <div class="modal-header">
+            <h3>提醒管理</h3>
+            <button id="watchReminderCloseButton" type="button">关闭</button>
+          </div>
+          <div class="watch-reminder-content">
+            <section class="watch-reminder-section">
+              <h4>提醒规则</h4>
+              <div class="watch-reminder-form">
+                <label>
+                  股票代码
+                  <input id="watchReminderSymbolInput" type="text" placeholder="600519 / sh600519" />
+                </label>
+                <label>
+                  条件类型
+                  <select id="watchReminderConditionSelect">
+                    <option value="priceAbove">价格达到/高于</option>
+                    <option value="priceBelow">价格低于</option>
+                    <option value="priceRange">价格区间</option>
+                    <option value="maBelow">低于均线</option>
+                    <option value="bollBreak">突破或跌破BOLL</option>
+                  </select>
+                </label>
+                <label>
+                  周期
+                  <select id="watchReminderPeriodSelect">
+                    <option value="m1">1分钟</option>
+                    <option value="m5">5分钟</option>
+                    <option value="m15">15分钟</option>
+                    <option value="m30">30分钟</option>
+                    <option value="m60">60分钟</option>
+                    <option value="day">日K</option>
+                  </select>
+                </label>
+                <label>
+                  价格
+                  <input id="watchReminderTargetInput" type="number" step="0.01" placeholder="目标价" />
+                </label>
+                <label>
+                  区间下限
+                  <input id="watchReminderMinInput" type="number" step="0.01" placeholder="最低价" />
+                </label>
+                <label>
+                  区间上限
+                  <input id="watchReminderMaxInput" type="number" step="0.01" placeholder="最高价" />
+                </label>
+                <label>
+                  均线
+                  <select id="watchReminderMaSelect">
+                    <option value="5">MA5</option>
+                    <option value="10">MA10</option>
+                    <option value="17">MA17</option>
+                    <option value="20">MA20</option>
+                    <option value="60">MA60</option>
+                  </select>
+                </label>
+                <label>
+                  BOLL线
+                  <select id="watchReminderBollLineSelect">
+                    <option value="upper">上轨</option>
+                    <option value="middle">中轨</option>
+                    <option value="lower">下轨</option>
+                  </select>
+                </label>
+                <label>
+                  BOLL方向
+                  <select id="watchReminderBollDirectionSelect">
+                    <option value="above">突破</option>
+                    <option value="below">跌破</option>
+                  </select>
+                </label>
+                <button id="watchAddReminderRuleButton" type="button">添加提醒</button>
+              </div>
+              <div id="watchReminderRulesList" class="watch-reminder-list"></div>
+            </section>
+            <section class="watch-reminder-section">
+              <div class="watch-reminder-history-head">
+                <h4>触发历史</h4>
+                <button id="watchClearReminderHistoryButton" type="button">一键清空</button>
+              </div>
+              <div id="watchReminderHistoryList" class="watch-reminder-history"></div>
+            </section>
+          </div>
+        </div>
+      </div>
+
       <div id="watchNotesModal" class="watch-notes-modal" hidden>
         <div class="watch-notes-dialog" role="dialog" aria-modal="true" aria-labelledby="watchNotesTitle">
           <div class="watch-notes-dialog-head">
@@ -169,7 +257,7 @@
     </main>
 
     <script src="assets/listing-dates.js"></script>
-    <script src="assets/watch.js?v=20260731-kline-ma-colors"></script>
+    <script src="assets/watch.js?v=20260731-reminders"></script>
     <script>
       window.stockWatch.initWatchPage(document);
     </script>

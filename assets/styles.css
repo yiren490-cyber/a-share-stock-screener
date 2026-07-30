@@ -1468,13 +1468,13 @@ svg {
   accent-color: #dc2626;
 }
 
-.watch-realtime-button {
+.watch-reminder-button {
   min-width: 118px;
   background: #dc2626;
   border-color: #dc2626;
 }
 
-.watch-realtime-button.is-paused {
+.watch-reminder-button.is-active {
   background: #1d4ed8;
   border-color: #1d4ed8;
 }
@@ -1666,6 +1666,10 @@ svg {
   padding: 12px;
 }
 
+.watch-realtime-panel {
+  position: relative;
+}
+
 .watch-category-panel h2,
 .watch-section-header h2,
 .watch-chart-card h3,
@@ -1733,6 +1737,168 @@ svg {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+}
+
+.watch-reminder-toasts {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 36;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  width: min(360px, 82vw);
+  pointer-events: none;
+}
+
+.watch-reminder-toast {
+  width: 100%;
+  margin-top: -50px;
+  border: 1px solid #f59e0b;
+  border-radius: 8px;
+  background: #fffbeb;
+  box-shadow: 0 18px 38px rgba(15, 23, 42, 0.22);
+  color: #78350f;
+  pointer-events: auto;
+}
+
+.watch-reminder-toast:first-child {
+  margin-top: 0;
+}
+
+.watch-reminder-toast-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  font-weight: 800;
+}
+
+.watch-reminder-toast-head button {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+}
+
+.watch-reminder-toast-body {
+  display: grid;
+  gap: 6px;
+  padding: 0 10px 10px;
+  font-size: 13px;
+}
+
+.watch-reminder-toast-body button {
+  width: fit-content;
+  height: 28px;
+  padding: 0 10px;
+  font-size: 12px;
+}
+
+.watch-reminder-modal {
+  width: min(920px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
+  overflow: auto;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 14px;
+  background: #ffffff;
+  box-shadow: 0 22px 60px rgba(15, 23, 42, 0.24);
+}
+
+.watch-reminder-content {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(280px, 0.9fr);
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.watch-reminder-section {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+}
+
+.watch-reminder-section h4 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.watch-reminder-form {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.watch-reminder-form label,
+.watch-reminder-rule,
+.watch-reminder-history-item {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.watch-reminder-form input,
+.watch-reminder-form select {
+  height: 30px;
+  min-width: 0;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 0 8px;
+}
+
+.watch-reminder-form button {
+  align-self: end;
+  height: 30px;
+}
+
+.watch-reminder-list,
+.watch-reminder-history {
+  display: grid;
+  gap: 8px;
+  max-height: 320px;
+  overflow: auto;
+}
+
+.watch-reminder-rule,
+.watch-reminder-history-item {
+  padding: 8px;
+  border: 1px solid #d8e1eb;
+  border-radius: 7px;
+  background: #f8fafc;
+}
+
+.watch-reminder-rule-head,
+.watch-reminder-history-head,
+.watch-reminder-history-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.watch-reminder-rule-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.watch-reminder-rule-actions label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.watch-reminder-rule button,
+.watch-reminder-history-item button,
+.watch-reminder-history-head button {
+  height: 28px;
+  padding: 0 9px;
+  font-size: 12px;
 }
 
 .watch-title-row {
@@ -2442,7 +2608,7 @@ svg {
     align-items: stretch;
   }
 
-  .watch-realtime-button {
+  .watch-reminder-button {
     width: 100%;
   }
 
@@ -2454,5 +2620,10 @@ svg {
   .watch-audio-bar .watch-upload-audio-button,
   .watch-audio-bar select {
     width: 100%;
+  }
+
+  .watch-reminder-content,
+  .watch-reminder-form {
+    grid-template-columns: 1fr;
   }
 }
