@@ -2160,7 +2160,7 @@
     if (!row) return "等待数据";
     const base = `${row.date}  收:${formatNumber(row.close)}  开:${formatNumber(row.open)}  低:${formatNumber(row.low)}  高:${formatNumber(row.high)}`;
     const maText = maValues
-      ? `  ${MA_PERIODS.map((period) => `MA${period}:${formatNumber(maValues[period])}`).join("  ")}`
+      ? `  ${MA_PERIODS.map((period, index) => `<span class="watch-ma-value" style="color:${MA_COLORS[index]}">MA${period}:${formatNumber(maValues[period])}</span>`).join("  ")}`
       : "";
     return `${base}${maText}`;
   }
@@ -2199,7 +2199,7 @@
            <path d="${seriesPath(boll.map((item) => item.boll), scale.y, pad.left, w - pad.right)}" fill="none" stroke="#111827" stroke-width="1" />
            <path d="${seriesPath(boll.map((item) => item.lb), scale.y, pad.left, w - pad.right)}" fill="none" stroke="#7c3aed" stroke-width="1.1" />`
         : MA_PERIODS.map((period, index) => `<path d="${seriesPath(maByPeriod.get(period), scale.y, pad.left, w - pad.right)}" fill="none" stroke="${MA_COLORS[index]}" stroke-width="1.2" />`).join("");
-    const hoverIndex = nearestIndexForDate(rows, hoverDate);
+    const hoverIndex = hoverDate ? nearestIndexForDate(rows, hoverDate) : rows.length - 1;
     const hoverRow = hoverIndex >= 0 ? rows[hoverIndex] : rows[rows.length - 1];
     const hoverX = hoverIndex >= 0 ? xAt(hoverIndex, rows.length, pad.left, w - pad.right) : null;
     const crosshair =
@@ -2218,7 +2218,7 @@
         mode === "ma" && hoverIndex >= 0
           ? Object.fromEntries(MA_PERIODS.map((period) => [period, maByPeriod.get(period)[hoverIndex]]))
           : null;
-      info.textContent = renderKlineInfo(hoverRow || rows[rows.length - 1], maValues);
+      info.innerHTML = renderKlineInfo(hoverRow || rows[rows.length - 1], maValues);
     }
   }
 
@@ -2706,6 +2706,7 @@
     intradayPriceLineColor,
     calculateIntradayTrendStates,
     drawIntradayChart,
+    drawKlineChart,
     positionNotesDialogAtPageLeft,
     mergeAudioItems,
     hasStoredAlertAudio,

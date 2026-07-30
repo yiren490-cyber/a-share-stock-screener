@@ -2162,6 +2162,12 @@ svg {
   font-size: 12px;
 }
 
+.watch-ma-value {
+  display: inline-block;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
 .watch-pct.is-up {
   color: #d93025;
   font-weight: 800;
