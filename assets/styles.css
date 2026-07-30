@@ -893,13 +893,15 @@ tbody tr:nth-child(even) {
 
 .new-category-row input,
 .new-category-row #createCategoryButton,
-.new-category-row #watchCreateCategoryButton {
+.new-category-row #watchCreateCategoryButton,
+.new-category-row #watchSaveManagedCategoryButton {
   display: none;
 }
 
 .new-category-row.is-adding input,
 .new-category-row.is-adding #createCategoryButton,
-.new-category-row.is-adding #watchCreateCategoryButton {
+.new-category-row.is-adding #watchCreateCategoryButton,
+.new-category-row.is-adding #watchSaveManagedCategoryButton {
   display: block;
 }
 
@@ -1671,6 +1673,19 @@ svg {
 .watch-period-panel h3 {
   margin: 0;
   font-size: 16px;
+}
+
+.watch-category-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.watch-category-heading button {
+  height: 28px;
+  padding: 0 10px;
+  font-size: 12px;
 }
 
 .watch-category-list {

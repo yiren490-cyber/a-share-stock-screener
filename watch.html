@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>A股实时盯盘</title>
     <link rel="icon" href="data:," />
-    <link rel="stylesheet" href="assets/styles.css?v=20260730-watch-category" />
+    <link rel="stylesheet" href="assets/styles.css?v=20260731-watch-category-manage" />
   </head>
   <body class="watch-page">
     <main class="watch-shell">
@@ -75,7 +75,10 @@
 
       <section class="watch-main-grid">
         <aside class="watch-category-panel">
-          <h2>股票分组</h2>
+          <div class="watch-category-heading">
+            <h2>股票分组</h2>
+            <button id="watchManageCategoryButton" type="button">管理分组</button>
+          </div>
           <div id="watchCategoryList" class="watch-category-list"></div>
         </aside>
 
@@ -137,6 +140,23 @@
         </div>
       </div>
 
+      <div class="modal-backdrop" id="watchManageCategoryModal" hidden>
+        <div class="category-modal" role="dialog" aria-modal="true" aria-label="管理分组">
+          <div class="modal-header">
+            <h3>管理分组</h3>
+            <button id="watchCloseManageCategoryButton" type="button">关闭</button>
+          </div>
+          <div class="modal-body">
+            <div class="manage-category-list" id="watchManageCategoryList"></div>
+            <div class="new-category-row is-adding">
+              <button id="watchAddManagedCategoryButton" type="button">新增分组</button>
+              <input id="watchManagedCategoryNameInput" type="text" placeholder="填写分组名" />
+              <button id="watchSaveManagedCategoryButton" type="button">保存</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div id="watchNotesModal" class="watch-notes-modal" hidden>
         <div class="watch-notes-dialog" role="dialog" aria-modal="true" aria-labelledby="watchNotesTitle">
           <div class="watch-notes-dialog-head">
@@ -149,7 +169,7 @@
     </main>
 
     <script src="assets/listing-dates.js"></script>
-    <script src="assets/watch.js?v=20260730-watch-category"></script>
+    <script src="assets/watch.js?v=20260731-watch-category-manage"></script>
     <script>
       window.stockWatch.initWatchPage(document);
     </script>

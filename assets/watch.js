@@ -102,6 +102,50 @@
     return next;
   }
 
+  function normalizeCategories(categories) {
+    return Object.fromEntries(
+      Object.entries(categories || {}).map(([name, symbols]) => [
+        name,
+        [...new Set((Array.isArray(symbols) ? symbols : []).map(normalizeSymbol).filter(Boolean))],
+      ])
+    );
+  }
+
+  function saveCategoriesToStorage(storage, categories) {
+    if (storage) storage.setItem("aShareCategories", JSON.stringify(categories || {}));
+  }
+
+  function renameCategoryGroupForStorage(storage, categories, fromName, toName) {
+    const sourceName = String(fromName || "").trim();
+    const targetName = String(toName || "").trim();
+    const next = normalizeCategories(categories);
+    if (!sourceName || !targetName || !next[sourceName]) return next;
+    if (sourceName === targetName) return next;
+    next[targetName] = [...new Set([...(next[targetName] || []), ...next[sourceName]])];
+    delete next[sourceName];
+    saveCategoriesToStorage(storage, next);
+    return next;
+  }
+
+  function removeSymbolFromCategoryForStorage(storage, categories, categoryName, symbol) {
+    const name = String(categoryName || "").trim();
+    const normalized = normalizeSymbol(symbol);
+    const next = normalizeCategories(categories);
+    if (!name || !normalized || !Array.isArray(next[name])) return next;
+    next[name] = next[name].filter((item) => item !== normalized);
+    saveCategoriesToStorage(storage, next);
+    return next;
+  }
+
+  function addManagedCategoryForStorage(storage, categories, categoryName) {
+    const name = String(categoryName || "").trim();
+    const next = normalizeCategories(categories);
+    if (!name) return next;
+    next[name] = next[name] || [];
+    saveCategoriesToStorage(storage, next);
+    return next;
+  }
+
   function makeCategoryNavigator(categories, categoryName, symbol) {
     const symbols = ((categories && categories[categoryName]) || []).map(normalizeSymbol).filter(Boolean);
     const normalized = normalizeSymbol(symbol);
@@ -653,6 +697,13 @@
       prevButton: doc.getElementById("watchPrevButton"),
       nextButton: doc.getElementById("watchNextButton"),
       categoryList: doc.getElementById("watchCategoryList"),
+      manageCategoryButton: doc.getElementById("watchManageCategoryButton"),
+      manageCategoryModal: doc.getElementById("watchManageCategoryModal"),
+      closeManageCategoryButton: doc.getElementById("watchCloseManageCategoryButton"),
+      manageCategoryList: doc.getElementById("watchManageCategoryList"),
+      addManagedCategoryButton: doc.getElementById("watchAddManagedCategoryButton"),
+      managedCategoryNameInput: doc.getElementById("watchManagedCategoryNameInput"),
+      saveManagedCategoryButton: doc.getElementById("watchSaveManagedCategoryButton"),
       stockTitle: doc.getElementById("watchStockTitle"),
       notesButton: doc.getElementById("watchNotesButton"),
       addCategoryButton: doc.getElementById("watchAddCategoryButton"),
@@ -757,6 +808,33 @@
     }
     if (els.createCategoryButton) els.createCategoryButton.addEventListener("click", () => createWatchCategoryFromModal(state, els));
     if (els.saveCategoryButton) els.saveCategoryButton.addEventListener("click", () => saveCurrentCategory(state, els));
+    if (els.manageCategoryButton) els.manageCategoryButton.addEventListener("click", () => openWatchManageCategoryModal(state, els));
+    if (els.closeManageCategoryButton) els.closeManageCategoryButton.addEventListener("click", () => closeWatchManageCategoryModal(els));
+    if (els.manageCategoryModal) {
+      els.manageCategoryModal.addEventListener("click", (event) => {
+        if (event.target === els.manageCategoryModal) closeWatchManageCategoryModal(els);
+      });
+    }
+    if (els.addManagedCategoryButton) els.addManagedCategoryButton.addEventListener("click", () => els.managedCategoryNameInput && els.managedCategoryNameInput.focus());
+    if (els.saveManagedCategoryButton) els.saveManagedCategoryButton.addEventListener("click", () => saveManagedCategoryFromModal(state, els));
+    if (els.manageCategoryList) {
+      els.manageCategoryList.addEventListener("click", (event) => {
+        const deleteButton = event.target.closest("[data-delete-watch-category]");
+        if (deleteButton) {
+          deleteWatchCategory(state, els, deleteButton.dataset.deleteWatchCategory);
+          return;
+        }
+        const renameButton = event.target.closest("[data-rename-watch-category]");
+        if (renameButton) {
+          const row = renameButton.closest(".manage-category-row");
+          const input = row && row.querySelector("[data-watch-category-rename-input]");
+          renameWatchCategory(state, els, renameButton.dataset.renameWatchCategory, input && input.value);
+          return;
+        }
+        const removeButton = event.target.closest("[data-remove-watch-category-symbol]");
+        if (removeButton) removeWatchCategorySymbol(state, els, removeButton.dataset.categoryName, removeButton.dataset.removeWatchCategorySymbol);
+      });
+    }
     els.notesCloseButton.addEventListener("click", () => closeNotesModal(els));
     els.notesModal.addEventListener("click", (event) => {
       if (event.target === els.notesModal) closeNotesModal(els);
@@ -1266,6 +1344,118 @@
     updateNavigator(state, els);
     closeWatchCategoryModal(els);
     setStatus(els, `已保存到分组：${name}（${state.categories[name].length}只）`);
+  }
+
+  function categoryStockLabel(state, symbol) {
+    const normalized = normalizeSymbol(symbol);
+    const code = normalized ? normalized.slice(2) : String(symbol || "");
+    const name = normalized && state.quoteNameCache[normalized];
+    return name ? `${name} ${code}` : code;
+  }
+
+  function renderWatchManageCategoryList(state, els) {
+    if (!els.manageCategoryList) return;
+    state.categories = readCategories(root.localStorage);
+    const names = Object.keys(state.categories).sort((a, b) => a.localeCompare(b, "zh-CN"));
+    els.manageCategoryList.innerHTML = names.length
+      ? names
+          .map((name) => {
+            const stocks = state.categories[name] || [];
+            const stockRows = stocks.length
+              ? stocks
+                  .map(
+                    (symbol) => `<div class="manage-category-stock">
+                      <span>${escapeHtml(categoryStockLabel(state, symbol))}</span>
+                      <button type="button" data-remove-watch-category-symbol="${escapeHtml(symbol)}" data-category-name="${escapeHtml(name)}">删除</button>
+                    </div>`
+                  )
+                  .join("")
+              : '<p class="empty-note">空分组</p>';
+            return `<div class="manage-category-row">
+              <div class="manage-category-edit">
+                <input type="text" value="${escapeHtml(name)}" data-watch-category-rename-input />
+                <button type="button" data-rename-watch-category="${escapeHtml(name)}">保存名称</button>
+                <button type="button" data-delete-watch-category="${escapeHtml(name)}">删除分组</button>
+              </div>
+              <details>
+                <summary>股票列表（${stocks.length}）</summary>
+                <div class="manage-category-stocks">${stockRows}</div>
+              </details>
+            </div>`;
+          })
+          .join("")
+      : '<p class="empty-note">暂无分组</p>';
+  }
+
+  function refreshWatchCategoryViews(state, els) {
+    state.categories = readCategories(root.localStorage);
+    renderCategories(state, els);
+    renderWatchCategorySelect(state, els);
+    renderWatchManageCategoryList(state, els);
+    updateNavigator(state, els);
+  }
+
+  function openWatchManageCategoryModal(state, els) {
+    renderWatchManageCategoryList(state, els);
+    if (els.managedCategoryNameInput) els.managedCategoryNameInput.value = "";
+    if (els.manageCategoryModal) els.manageCategoryModal.hidden = false;
+  }
+
+  function closeWatchManageCategoryModal(els) {
+    if (els.manageCategoryModal) els.manageCategoryModal.hidden = true;
+  }
+
+  function saveManagedCategoryFromModal(state, els) {
+    const name = els.managedCategoryNameInput ? els.managedCategoryNameInput.value.trim() : "";
+    if (!name) {
+      setStatus(els, "请填写分组名。");
+      return;
+    }
+    state.categories = addManagedCategoryForStorage(root.localStorage, state.categories, name);
+    state.openCategories.add(name);
+    if (els.managedCategoryNameInput) els.managedCategoryNameInput.value = "";
+    refreshWatchCategoryViews(state, els);
+    setStatus(els, `已新增分组：${name}`);
+  }
+
+  function renameWatchCategory(state, els, oldName, newName) {
+    const targetName = String(newName || "").trim();
+    if (!targetName) {
+      setStatus(els, "请填写分组名。");
+      return;
+    }
+    state.categories = renameCategoryGroupForStorage(root.localStorage, state.categories, oldName, targetName);
+    if (state.categoryName === oldName) {
+      state.categoryName = targetName;
+      root.localStorage.setItem(LAST_CATEGORY_KEY, targetName);
+    }
+    if (state.openCategories.has(oldName)) {
+      state.openCategories.delete(oldName);
+      state.openCategories.add(targetName);
+    }
+    refreshWatchCategoryViews(state, els);
+    setStatus(els, `已修改分组名称：${targetName}`);
+  }
+
+  function deleteWatchCategory(state, els, name) {
+    const targetName = String(name || "").trim();
+    if (!targetName) return;
+    const next = normalizeCategories(state.categories);
+    delete next[targetName];
+    saveCategoriesToStorage(root.localStorage, next);
+    if (state.categoryName === targetName) {
+      state.categoryName = "";
+      root.localStorage.setItem(LAST_CATEGORY_KEY, "");
+    }
+    state.openCategories.delete(targetName);
+    refreshWatchCategoryViews(state, els);
+    setStatus(els, `已删除分组：${targetName}`);
+  }
+
+  function removeWatchCategorySymbol(state, els, categoryName, symbol) {
+    state.categories = removeSymbolFromCategoryForStorage(root.localStorage, state.categories, categoryName, symbol);
+    refreshWatchCategoryViews(state, els);
+    setStatus(els, `已从分组移除：${normalizeSymbol(symbol) || symbol}`);
   }
 
   function loadFromInput(state, els) {
@@ -2470,6 +2660,9 @@
     normalizeSymbol,
     readCategories,
     addSymbolToCategory,
+    renameCategoryGroupForStorage,
+    removeSymbolFromCategoryForStorage,
+    addManagedCategoryForStorage,
     makeCategoryNavigator,
     defaultPanelSettings,
     mergePanelSettings,
