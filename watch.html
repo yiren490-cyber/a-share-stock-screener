@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>A股实时盯盘</title>
     <link rel="icon" href="data:," />
-    <link rel="stylesheet" href="assets/styles.css?v=20260729-period-ma-select" />
+    <link rel="stylesheet" href="assets/styles.css?v=20260730-watch-category" />
   </head>
   <body class="watch-page">
     <main class="watch-shell">
@@ -85,6 +85,7 @@
               <div class="watch-title-row">
                 <h2 id="watchStockTitle">未选择股票</h2>
                 <button id="watchNotesButton" class="watch-notes-button" type="button" aria-label="股票笔记" title="股票笔记">✎</button>
+                <button id="watchAddCategoryButton" class="watch-add-category-button" type="button" aria-label="加入分组" title="加入分组">＋</button>
                 <div id="watchNotesPreview" class="watch-notes-popover" hidden></div>
               </div>
               <p id="watchStockMeta">--</p>
@@ -113,6 +114,29 @@
       </section>
       <section id="periodPanels" class="watch-period-grid" aria-label="周期图"></section>
 
+      <div class="modal-backdrop" id="watchCategoryModal" hidden>
+        <div class="category-modal" role="dialog" aria-modal="true" aria-label="保存到分组">
+          <div class="modal-header">
+            <h3>保存到分组</h3>
+            <button id="watchCloseCategoryModalButton" type="button">关闭</button>
+          </div>
+          <div class="modal-body">
+            <label>
+              选择已有分组
+              <select id="watchSaveCategorySelect" aria-label="保存到已有分组"></select>
+            </label>
+            <div class="new-category-row">
+              <button id="watchShowNewCategoryButton" type="button">添加分组</button>
+              <input id="watchCategoryNameInput" type="text" placeholder="填写分组名" />
+              <button id="watchCreateCategoryButton" type="button">保存</button>
+            </div>
+          </div>
+          <div class="modal-actions">
+            <button id="watchSaveCategoryButton" type="button">确认保存</button>
+          </div>
+        </div>
+      </div>
+
       <div id="watchNotesModal" class="watch-notes-modal" hidden>
         <div class="watch-notes-dialog" role="dialog" aria-modal="true" aria-labelledby="watchNotesTitle">
           <div class="watch-notes-dialog-head">
@@ -125,7 +149,7 @@
     </main>
 
     <script src="assets/listing-dates.js"></script>
-    <script src="assets/watch.js?v=20260729-period-ma-select"></script>
+    <script src="assets/watch.js?v=20260730-watch-category"></script>
     <script>
       window.stockWatch.initWatchPage(document);
     </script>

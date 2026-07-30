@@ -892,12 +892,14 @@ tbody tr:nth-child(even) {
 }
 
 .new-category-row input,
-.new-category-row #createCategoryButton {
+.new-category-row #createCategoryButton,
+.new-category-row #watchCreateCategoryButton {
   display: none;
 }
 
 .new-category-row.is-adding input,
-.new-category-row.is-adding #createCategoryButton {
+.new-category-row.is-adding #createCategoryButton,
+.new-category-row.is-adding #watchCreateCategoryButton {
   display: block;
 }
 
@@ -1725,7 +1727,8 @@ svg {
   gap: 8px;
 }
 
-.watch-notes-button {
+.watch-notes-button,
+.watch-add-category-button {
   flex: 0 0 auto;
   height: 26px;
   min-width: 30px;
@@ -1734,6 +1737,10 @@ svg {
   background: #f8fafc;
   color: #1d4ed8;
   font-size: 12px;
+}
+
+.watch-add-category-button {
+  color: #0f766e;
 }
 
 .watch-notes-button.has-notes {

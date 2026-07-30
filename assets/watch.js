@@ -82,6 +82,26 @@
     }
   }
 
+  function addSymbolToCategory(storage, categories, categoryName, symbol) {
+    const name = String(categoryName || "").trim();
+    const normalized = normalizeSymbol(symbol);
+    const next = Object.fromEntries(
+      Object.entries(categories || {}).map(([groupName, symbols]) => [
+        groupName,
+        [...new Set((Array.isArray(symbols) ? symbols : []).map(normalizeSymbol).filter(Boolean))],
+      ])
+    );
+    if (!name) return next;
+    if (!normalized) {
+      next[name] = next[name] || [];
+      if (storage) storage.setItem("aShareCategories", JSON.stringify(next));
+      return next;
+    }
+    next[name] = [...new Set([...(next[name] || []), normalized])];
+    if (storage) storage.setItem("aShareCategories", JSON.stringify(next));
+    return next;
+  }
+
   function makeCategoryNavigator(categories, categoryName, symbol) {
     const symbols = ((categories && categories[categoryName]) || []).map(normalizeSymbol).filter(Boolean);
     const normalized = normalizeSymbol(symbol);
@@ -635,6 +655,14 @@
       categoryList: doc.getElementById("watchCategoryList"),
       stockTitle: doc.getElementById("watchStockTitle"),
       notesButton: doc.getElementById("watchNotesButton"),
+      addCategoryButton: doc.getElementById("watchAddCategoryButton"),
+      categoryModal: doc.getElementById("watchCategoryModal"),
+      closeCategoryModalButton: doc.getElementById("watchCloseCategoryModalButton"),
+      saveCategorySelect: doc.getElementById("watchSaveCategorySelect"),
+      showNewCategoryButton: doc.getElementById("watchShowNewCategoryButton"),
+      categoryNameInput: doc.getElementById("watchCategoryNameInput"),
+      createCategoryButton: doc.getElementById("watchCreateCategoryButton"),
+      saveCategoryButton: doc.getElementById("watchSaveCategoryButton"),
       notesPreview: doc.getElementById("watchNotesPreview"),
       notesModal: doc.getElementById("watchNotesModal"),
       notesDialog: doc.querySelector(".watch-notes-dialog"),
@@ -713,6 +741,22 @@
     els.notesButton.addEventListener("mouseenter", () => showNotesPreview(state, els));
     els.notesButton.addEventListener("mouseleave", () => hideNotesPreview(els));
     els.notesButton.addEventListener("click", () => openNotesModal(state, els));
+    if (els.addCategoryButton) els.addCategoryButton.addEventListener("click", () => openWatchCategoryModal(state, els));
+    if (els.closeCategoryModalButton) els.closeCategoryModalButton.addEventListener("click", () => closeWatchCategoryModal(els));
+    if (els.categoryModal) {
+      els.categoryModal.addEventListener("click", (event) => {
+        if (event.target === els.categoryModal) closeWatchCategoryModal(els);
+      });
+    }
+    if (els.showNewCategoryButton) {
+      els.showNewCategoryButton.addEventListener("click", () => {
+        const row = els.categoryModal && els.categoryModal.querySelector(".new-category-row");
+        if (row) row.classList.add("is-adding");
+        if (els.categoryNameInput) els.categoryNameInput.focus();
+      });
+    }
+    if (els.createCategoryButton) els.createCategoryButton.addEventListener("click", () => createWatchCategoryFromModal(state, els));
+    if (els.saveCategoryButton) els.saveCategoryButton.addEventListener("click", () => saveCurrentCategory(state, els));
     els.notesCloseButton.addEventListener("click", () => closeNotesModal(els));
     els.notesModal.addEventListener("click", (event) => {
       if (event.target === els.notesModal) closeNotesModal(els);
@@ -1160,6 +1204,68 @@
       window.addEventListener("mousemove", onMove);
       window.addEventListener("mouseup", onUp);
     });
+  }
+
+  function renderWatchCategorySelect(state, els) {
+    if (!els.saveCategorySelect) return;
+    state.categories = readCategories(root.localStorage);
+    const names = Object.keys(state.categories).sort((a, b) => a.localeCompare(b, "zh-CN"));
+    const options = names.map((name) => `<option value="${escapeHtml(name)}">${escapeHtml(name)}（${state.categories[name].length}）</option>`).join("");
+    els.saveCategorySelect.innerHTML = `<option value="" disabled hidden>保存到已有分组</option>${options}`;
+    if (state.categoryName && state.categories[state.categoryName]) els.saveCategorySelect.value = state.categoryName;
+    if (!els.saveCategorySelect.value) els.saveCategorySelect.selectedIndex = 0;
+  }
+
+  function openWatchCategoryModal(state, els) {
+    if (!state.symbol) {
+      setStatus(els, "请先载入股票。");
+      return;
+    }
+    renderWatchCategorySelect(state, els);
+    if (els.categoryNameInput) els.categoryNameInput.value = "";
+    if (els.categoryModal) {
+      const row = els.categoryModal.querySelector(".new-category-row");
+      if (row) row.classList.remove("is-adding");
+      els.categoryModal.hidden = false;
+    }
+  }
+
+  function closeWatchCategoryModal(els) {
+    if (els.categoryModal) els.categoryModal.hidden = true;
+  }
+
+  function createWatchCategoryFromModal(state, els) {
+    const name = els.categoryNameInput ? els.categoryNameInput.value.trim() : "";
+    if (!name) {
+      setStatus(els, "请填写分组名。");
+      return;
+    }
+    state.categories = addSymbolToCategory(root.localStorage, state.categories, name, "");
+    renderWatchCategorySelect(state, els);
+    if (els.saveCategorySelect) els.saveCategorySelect.value = name;
+    setStatus(els, `已添加分组：${name}`);
+  }
+
+  function saveCurrentCategory(state, els) {
+    const name = ((els.categoryNameInput && els.categoryNameInput.value.trim()) || (els.saveCategorySelect && els.saveCategorySelect.value) || "").trim();
+    if (!state.symbol) {
+      setStatus(els, "请先载入股票。");
+      return;
+    }
+    if (!name) {
+      setStatus(els, "请输入新分类名，或选择已有分类。");
+      return;
+    }
+    state.categories = addSymbolToCategory(root.localStorage, state.categories, name, state.symbol);
+    state.categoryName = name;
+    state.openCategories.add(name);
+    root.localStorage.setItem(LAST_CATEGORY_KEY, name);
+    if (els.categoryNameInput) els.categoryNameInput.value = "";
+    renderWatchCategorySelect(state, els);
+    renderCategories(state, els);
+    updateNavigator(state, els);
+    closeWatchCategoryModal(els);
+    setStatus(els, `已保存到分组：${name}（${state.categories[name].length}只）`);
   }
 
   function loadFromInput(state, els) {
@@ -2363,6 +2469,7 @@
   return {
     normalizeSymbol,
     readCategories,
+    addSymbolToCategory,
     makeCategoryNavigator,
     defaultPanelSettings,
     mergePanelSettings,
