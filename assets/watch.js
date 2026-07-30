@@ -572,12 +572,23 @@
     return `reminder-${Date.now().toString(36)}-${Math.round(Math.random() * 100000).toString(36)}`;
   }
 
+  function reminderFormConfigForType(type) {
+    const key = ["price", "range", "ma", "boll"].includes(type) ? type : "price";
+    const configs = {
+      price: { fields: ["priceDirection", "targetPrice"] },
+      range: { fields: ["priceRange"] },
+      ma: { fields: ["maDirection", "maPeriod"] },
+      boll: { fields: ["bollDirection", "bollLine"] },
+    };
+    return configs[key];
+  }
+
   function normalizeReminderRules(rules) {
     return (Array.isArray(rules) ? rules : [])
       .map((rule) => {
         const symbol = normalizeSymbol(rule && rule.symbol);
         if (!symbol) return null;
-        const conditionType = ["priceAbove", "priceBelow", "priceRange", "maBelow", "bollBreak"].includes(rule.conditionType) ? rule.conditionType : "priceAbove";
+        const conditionType = ["priceAbove", "priceBelow", "priceRange", "maAbove", "maBelow", "bollBreak"].includes(rule.conditionType) ? rule.conditionType : "priceAbove";
         return {
           id: String(rule.id || makeReminderId()),
           symbol,
@@ -641,7 +652,7 @@
   }
 
   function reminderNeedsKline(rule) {
-    return rule && (rule.conditionType === "maBelow" || rule.conditionType === "bollBreak");
+    return rule && (rule.conditionType === "maAbove" || rule.conditionType === "maBelow" || rule.conditionType === "bollBreak");
   }
 
   function reminderKlineKey(rule) {
@@ -650,9 +661,10 @@
 
   function reminderConditionText(rule, value = null) {
     const periodLabel = PERIOD_META[rule.period] ? PERIOD_META[rule.period].label : rule.period;
-    if (rule.conditionType === "priceAbove") return `价格达到/高于 ${formatNumber(rule.targetPrice)}`;
+    if (rule.conditionType === "priceAbove") return `价格高于 ${formatNumber(rule.targetPrice)}`;
     if (rule.conditionType === "priceBelow") return `价格低于 ${formatNumber(rule.targetPrice)}`;
     if (rule.conditionType === "priceRange") return `价格在 ${formatNumber(rule.minPrice)} - ${formatNumber(rule.maxPrice)} 区间`;
+    if (rule.conditionType === "maAbove") return `价格高于 ${periodLabel} MA${rule.maPeriod}${value === null ? "" : `（${formatNumber(value)}）`}`;
     if (rule.conditionType === "maBelow") return `价格低于 ${periodLabel} MA${rule.maPeriod}${value === null ? "" : `（${formatNumber(value)}）`}`;
     if (rule.conditionType === "bollBreak") {
       const lineLabel = { upper: "上轨", middle: "中轨", lower: "下轨" }[rule.bollLine] || "上轨";
@@ -671,10 +683,10 @@
     if (normalized.conditionType === "priceAbove") triggered = normalized.targetPrice !== null && price >= normalized.targetPrice;
     else if (normalized.conditionType === "priceBelow") triggered = normalized.targetPrice !== null && price <= normalized.targetPrice;
     else if (normalized.conditionType === "priceRange") triggered = normalized.minPrice !== null && normalized.maxPrice !== null && price >= normalized.minPrice && price <= normalized.maxPrice;
-    else if (normalized.conditionType === "maBelow") {
+    else if (normalized.conditionType === "maAbove" || normalized.conditionType === "maBelow") {
       const values = movingAverage(rows || [], normalized.maPeriod, "close");
       value = values.length ? values[values.length - 1] : null;
-      triggered = value !== null && price < value;
+      triggered = value !== null && (normalized.conditionType === "maAbove" ? price > value : price < value);
     } else if (normalized.conditionType === "bollBreak") {
       const boll = calculateBoll(rows || []).at(-1);
       value = boll ? { upper: boll.ub, middle: boll.boll, lower: boll.lb }[normalized.bollLine] : null;
@@ -817,6 +829,7 @@
       reminderHistory: readReminderHistory(root.localStorage),
       reminderTimer: null,
       reminderActiveRuleIds: new Set(),
+      reminderActiveTab: "rules",
       reminderToastZ: 80,
       activeNoteType: "watch",
       quoteLoading: false,
@@ -853,12 +866,21 @@
       reminderButton: doc.getElementById("watchReminderButton"),
       reminderModal: doc.getElementById("watchReminderModal"),
       reminderCloseButton: doc.getElementById("watchReminderCloseButton"),
+      addReminderModal: doc.getElementById("watchAddReminderModal"),
+      addReminderCloseButton: doc.getElementById("watchAddReminderCloseButton"),
+      openAddReminderButton: doc.getElementById("watchOpenAddReminderButton"),
+      reminderRulesTab: doc.getElementById("watchReminderRulesTab"),
+      reminderHistoryTab: doc.getElementById("watchReminderHistoryTab"),
+      reminderRulesPanel: doc.getElementById("watchReminderRulesPanel"),
+      reminderHistoryPanel: doc.getElementById("watchReminderHistoryPanel"),
       reminderSymbolInput: doc.getElementById("watchReminderSymbolInput"),
       reminderConditionSelect: doc.getElementById("watchReminderConditionSelect"),
       reminderPeriodSelect: doc.getElementById("watchReminderPeriodSelect"),
+      reminderPriceDirectionSelect: doc.getElementById("watchReminderPriceDirectionSelect"),
       reminderTargetInput: doc.getElementById("watchReminderTargetInput"),
       reminderMinInput: doc.getElementById("watchReminderMinInput"),
       reminderMaxInput: doc.getElementById("watchReminderMaxInput"),
+      reminderMaDirectionSelect: doc.getElementById("watchReminderMaDirectionSelect"),
       reminderMaSelect: doc.getElementById("watchReminderMaSelect"),
       reminderBollLineSelect: doc.getElementById("watchReminderBollLineSelect"),
       reminderBollDirectionSelect: doc.getElementById("watchReminderBollDirectionSelect"),
@@ -934,6 +956,16 @@
         if (event.target === els.reminderModal) closeReminderModal(els);
       });
     }
+    if (els.reminderRulesTab) els.reminderRulesTab.addEventListener("click", () => setReminderTab(state, els, "rules"));
+    if (els.reminderHistoryTab) els.reminderHistoryTab.addEventListener("click", () => setReminderTab(state, els, "history"));
+    if (els.openAddReminderButton) els.openAddReminderButton.addEventListener("click", () => openAddReminderModal(state, els));
+    if (els.addReminderCloseButton) els.addReminderCloseButton.addEventListener("click", () => closeAddReminderModal(els));
+    if (els.addReminderModal) {
+      els.addReminderModal.addEventListener("click", (event) => {
+        if (event.target === els.addReminderModal) closeAddReminderModal(els);
+      });
+    }
+    if (els.reminderConditionSelect) els.reminderConditionSelect.addEventListener("change", () => renderReminderFormFields(els));
     if (els.addReminderRuleButton) els.addReminderRuleButton.addEventListener("click", () => addReminderRuleFromForm(state, els));
     if (els.clearReminderHistoryButton) els.clearReminderHistoryButton.addEventListener("click", () => clearReminderHistory(state, els));
     if (els.reminderRulesList) {
@@ -1082,6 +1114,31 @@
     });
   }
 
+  function setReminderTab(state, els, tab) {
+    state.reminderActiveTab = tab === "history" ? "history" : "rules";
+    const isHistory = state.reminderActiveTab === "history";
+    if (els.reminderRulesTab) {
+      els.reminderRulesTab.classList.toggle("is-active", !isHistory);
+      els.reminderRulesTab.setAttribute("aria-selected", String(!isHistory));
+    }
+    if (els.reminderHistoryTab) {
+      els.reminderHistoryTab.classList.toggle("is-active", isHistory);
+      els.reminderHistoryTab.setAttribute("aria-selected", String(isHistory));
+    }
+    if (els.reminderRulesPanel) els.reminderRulesPanel.hidden = isHistory;
+    if (els.reminderHistoryPanel) els.reminderHistoryPanel.hidden = !isHistory;
+    if (els.openAddReminderButton) els.openAddReminderButton.hidden = isHistory;
+  }
+
+  function renderReminderFormFields(els) {
+    if (!els || !els.addReminderModal) return;
+    const type = els.reminderConditionSelect ? els.reminderConditionSelect.value : "price";
+    const fields = new Set(reminderFormConfigForType(type).fields);
+    els.addReminderModal.querySelectorAll("[data-reminder-field]").forEach((field) => {
+      field.hidden = !fields.has(field.dataset.reminderField);
+    });
+  }
+
   function renderReminderButton(state, els) {
     if (!els.reminderButton) return;
     const count = normalizeReminderRules(state.reminderRules).filter((rule) => rule.enabled).length;
@@ -1093,6 +1150,7 @@
     renderReminderRules(state, els);
     renderReminderHistory(state, els);
     renderReminderButton(state, els);
+    setReminderTab(state, els, state.reminderActiveTab);
   }
 
   function reminderStockLabel(rule) {
@@ -1145,20 +1203,38 @@
       : '<p class="empty-note">暂无触发历史</p>';
   }
 
-  function openReminderModal(state, els) {
+  function openReminderModal(state, els, tab = "rules") {
+    state.reminderActiveTab = tab === "history" ? "history" : "rules";
     renderReminderModal(state, els);
     if (els.reminderModal) els.reminderModal.hidden = false;
+  }
+
+  function openAddReminderModal(state, els) {
     if (els.reminderSymbolInput && state.symbol) els.reminderSymbolInput.value = state.symbol;
+    renderReminderFormFields(els);
+    if (els.addReminderModal) els.addReminderModal.hidden = false;
+  }
+
+  function closeAddReminderModal(els) {
+    if (els.addReminderModal) els.addReminderModal.hidden = true;
   }
 
   function closeReminderModal(els) {
     if (els.reminderModal) els.reminderModal.hidden = true;
   }
 
+  function reminderConditionTypeFromForm(els) {
+    const type = els.reminderConditionSelect ? els.reminderConditionSelect.value : "price";
+    if (type === "range") return "priceRange";
+    if (type === "ma") return (els.reminderMaDirectionSelect && els.reminderMaDirectionSelect.value) === "above" ? "maAbove" : "maBelow";
+    if (type === "boll") return "bollBreak";
+    return (els.reminderPriceDirectionSelect && els.reminderPriceDirectionSelect.value) === "below" ? "priceBelow" : "priceAbove";
+  }
+
   function reminderRuleFromForm(state, els) {
     const symbol = normalizeSymbol(els.reminderSymbolInput && els.reminderSymbolInput.value);
     if (!symbol) return { error: "请填写正确的股票代码。" };
-    const conditionType = els.reminderConditionSelect ? els.reminderConditionSelect.value : "priceAbove";
+    const conditionType = reminderConditionTypeFromForm(els);
     const rule = {
       id: makeReminderId(),
       symbol,
@@ -1187,6 +1263,8 @@
     }
     state.reminderRules = normalizeReminderRules([result.rule, ...state.reminderRules]);
     saveReminderRules(root.localStorage, state.reminderRules);
+    closeAddReminderModal(els);
+    state.reminderActiveTab = "rules";
     renderReminderModal(state, els);
     setStatus(els, `已添加提醒：${result.rule.symbol.slice(2)} ${reminderConditionText(result.rule)}`);
   }
@@ -1242,7 +1320,7 @@
       });
     }
     const viewButton = toast.querySelector("[data-view-reminders]");
-    if (viewButton) viewButton.addEventListener("click", () => openReminderModal(state, els));
+    if (viewButton) viewButton.addEventListener("click", () => openReminderModal(state, els, "history"));
     els.reminderToasts.appendChild(toast);
   }
 
@@ -3068,6 +3146,7 @@
     renameCategoryGroupForStorage,
     removeSymbolFromCategoryForStorage,
     addManagedCategoryForStorage,
+    reminderFormConfigForType,
     normalizeReminderRules,
     evaluateReminderRule,
     collectReminderTriggers,

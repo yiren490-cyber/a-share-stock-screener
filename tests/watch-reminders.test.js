@@ -8,7 +8,17 @@ const watchHtml = fs.readFileSync(path.join(__dirname, "..", "watch.html"), "utf
 assert(watchHtml.includes('id="watchReminderButton"'), "watch page should place reminder management where realtime refresh was");
 assert(!watchHtml.includes('id="watchRefreshButton"'), "watch page should remove the manual realtime refresh toggle");
 assert(watchHtml.includes('id="watchReminderModal"'), "watch page should include a reminder management modal");
+assert(watchHtml.includes('id="watchReminderRulesTab"'), "watch reminder management should use a rules tab");
+assert(watchHtml.includes('id="watchReminderHistoryTab"'), "watch reminder management should use a trigger history tab");
+assert(watchHtml.includes('id="watchOpenAddReminderButton"'), "watch reminder rules tab should expose an add reminder action");
+assert(watchHtml.includes('id="watchAddReminderModal"'), "watch page should use a separate add reminder modal");
 assert(watchHtml.includes('id="watchReminderToasts"'), "watch page should include a stacked reminder toast host");
+assert(!watchHtml.includes('id="audioStatus"'), "watch audio bar should not duplicate the currently selected audio text");
+
+assert.deepStrictEqual(watch.reminderFormConfigForType("price").fields, ["priceDirection", "targetPrice"]);
+assert.deepStrictEqual(watch.reminderFormConfigForType("range").fields, ["priceRange"]);
+assert.deepStrictEqual(watch.reminderFormConfigForType("ma").fields, ["maDirection", "maPeriod"]);
+assert.deepStrictEqual(watch.reminderFormConfigForType("boll").fields, ["bollDirection", "bollLine"]);
 
 const normalized = watch.normalizeReminderRules([
   { symbol: "600519", conditionType: "priceAbove", targetPrice: "10.5" },
@@ -25,6 +35,7 @@ assert.strictEqual(watch.evaluateReminderRule({ conditionType: "priceBelow", tar
 assert.strictEqual(watch.evaluateReminderRule({ conditionType: "priceRange", minPrice: 10, maxPrice: 11 }, quote).triggered, true);
 
 const maRows = Array.from({ length: 20 }, (_, index) => ({ date: `2026-07-${String(index + 1).padStart(2, "0")}`, close: 20, high: 21, low: 19, open: 20 }));
+assert.strictEqual(watch.evaluateReminderRule({ conditionType: "maAbove", maPeriod: 5 }, { ...quote, latestPrice: 21 }, maRows).triggered, true);
 assert.strictEqual(watch.evaluateReminderRule({ conditionType: "maBelow", maPeriod: 5 }, { ...quote, latestPrice: 19 }, maRows).triggered, true);
 assert.strictEqual(watch.evaluateReminderRule({ conditionType: "bollBreak", bollDirection: "above", bollLine: "upper" }, { ...quote, latestPrice: 21 }, maRows).triggered, true);
 assert.strictEqual(watch.evaluateReminderRule({ conditionType: "bollBreak", bollDirection: "below", bollLine: "lower" }, { ...quote, latestPrice: 19 }, maRows).triggered, true);

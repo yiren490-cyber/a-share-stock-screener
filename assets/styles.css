@@ -1795,7 +1795,8 @@ svg {
   font-size: 12px;
 }
 
-.watch-reminder-modal {
+.watch-reminder-modal,
+.watch-add-reminder-modal {
   width: min(920px, calc(100vw - 32px));
   max-height: calc(100vh - 32px);
   overflow: auto;
@@ -1806,11 +1807,49 @@ svg {
   box-shadow: 0 22px 60px rgba(15, 23, 42, 0.24);
 }
 
+.watch-add-reminder-modal {
+  width: min(680px, calc(100vw - 32px));
+}
+
 .watch-reminder-content {
   display: grid;
-  grid-template-columns: minmax(0, 1.1fr) minmax(280px, 0.9fr);
-  gap: 14px;
+  gap: 12px;
   margin-top: 14px;
+}
+
+.watch-reminder-tabs-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.watch-reminder-tabs {
+  display: inline-flex;
+  gap: 6px;
+  padding: 3px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.watch-reminder-tabs button,
+.watch-add-reminder-button {
+  height: 30px;
+  padding: 0 12px;
+  font-size: 13px;
+}
+
+.watch-reminder-tabs button {
+  border-color: transparent;
+  background: transparent;
+  color: #475569;
+}
+
+.watch-reminder-tabs button.is-active {
+  border-color: #93c5fd;
+  background: #dbeafe;
+  color: #1d4ed8;
 }
 
 .watch-reminder-section {
@@ -1839,6 +1878,10 @@ svg {
   color: #334155;
   font-size: 12px;
   font-weight: 700;
+}
+
+.watch-reminder-form label[hidden] {
+  display: none;
 }
 
 .watch-reminder-form input,
