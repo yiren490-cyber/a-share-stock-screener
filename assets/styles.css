@@ -1777,6 +1777,18 @@ svg {
   margin-top: 0;
 }
 
+.watch-reminder-toast.is-do-t {
+  border-color: #60a5fa;
+  background: #eff6ff;
+  color: #1e3a8a;
+}
+
+.watch-reminder-toast.is-do-t .watch-reminder-toast-body button {
+  border-color: #60a5fa;
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
 .watch-reminder-toast-head {
   display: flex;
   align-items: center;
@@ -1820,19 +1832,6 @@ svg {
 
 .watch-add-reminder-modal {
   width: min(680px, calc(100vw - 32px));
-}
-
-.watch-dot-modal {
-  border-color: #93c5fd;
-  background: #eff6ff;
-}
-
-.watch-dot-modal .modal-header {
-  border-color: #bfdbfe;
-}
-
-.watch-dot-modal .modal-header h3 {
-  color: #1d4ed8;
 }
 
 .watch-reminder-content {
@@ -1946,18 +1945,6 @@ svg {
 
 .watch-dot-form button {
   height: 32px;
-}
-
-.watch-dot-columns {
-  display: grid;
-  grid-template-columns: minmax(320px, 1fr) minmax(320px, 1fr);
-  gap: 12px;
-  align-items: start;
-}
-
-.watch-dot-list-column,
-.watch-dot-history-column {
-  min-width: 0;
 }
 
 .watch-reminder-list,
@@ -2750,8 +2737,7 @@ svg {
   }
 
   .watch-reminder-content,
-  .watch-reminder-form,
-  .watch-dot-columns {
+  .watch-reminder-form {
     grid-template-columns: 1fr;
   }
 }

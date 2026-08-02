@@ -923,6 +923,7 @@
       reminderTimer: null,
       reminderActiveRuleIds: new Set(),
       reminderActiveTab: "rules",
+      doTActiveTab: "list",
       reminderToastZ: 80,
       activeNoteType: "watch",
       quoteLoading: false,
@@ -967,6 +968,10 @@
       doTList: doc.getElementById("watchDoTList"),
       doTHistoryList: doc.getElementById("watchDoTHistoryList"),
       clearDoTHistoryButton: doc.getElementById("watchClearDoTHistoryButton"),
+      doTListTab: doc.getElementById("watchDoTListTab"),
+      doTHistoryTab: doc.getElementById("watchDoTHistoryTab"),
+      doTListPanel: doc.getElementById("watchDoTListPanel"),
+      doTHistoryPanel: doc.getElementById("watchDoTHistoryPanel"),
       reminderModal: doc.getElementById("watchReminderModal"),
       reminderCloseButton: doc.getElementById("watchReminderCloseButton"),
       addReminderModal: doc.getElementById("watchAddReminderModal"),
@@ -1067,6 +1072,8 @@
       });
     }
     if (els.clearDoTHistoryButton) els.clearDoTHistoryButton.addEventListener("click", () => clearDoTHistory(state, els));
+    if (els.doTListTab) els.doTListTab.addEventListener("click", () => setDoTTab(state, els, "list"));
+    if (els.doTHistoryTab) els.doTHistoryTab.addEventListener("click", () => setDoTTab(state, els, "history"));
     if (els.doTList) {
       els.doTList.addEventListener("change", (event) => {
         const checkbox = event.target.closest("[data-dot-enabled]");
@@ -1263,6 +1270,21 @@
     if (els.openAddReminderButton) els.openAddReminderButton.hidden = isHistory;
   }
 
+  function setDoTTab(state, els, tab) {
+    state.doTActiveTab = tab === "history" ? "history" : "list";
+    const isHistory = state.doTActiveTab === "history";
+    if (els.doTListTab) {
+      els.doTListTab.classList.toggle("is-active", !isHistory);
+      els.doTListTab.setAttribute("aria-selected", String(!isHistory));
+    }
+    if (els.doTHistoryTab) {
+      els.doTHistoryTab.classList.toggle("is-active", isHistory);
+      els.doTHistoryTab.setAttribute("aria-selected", String(isHistory));
+    }
+    if (els.doTListPanel) els.doTListPanel.hidden = isHistory;
+    if (els.doTHistoryPanel) els.doTHistoryPanel.hidden = !isHistory;
+  }
+
   function renderReminderFormFields(els) {
     if (!els || !els.addReminderModal) return;
     const type = els.reminderConditionSelect ? els.reminderConditionSelect.value : "price";
@@ -1297,6 +1319,7 @@
     renderDoTItems(state, els);
     renderDoTHistory(state, els);
     renderDoTButton(state, els);
+    setDoTTab(state, els, state.doTActiveTab);
   }
 
   function reminderStockLabel(state, rule) {
@@ -1394,6 +1417,7 @@
   }
 
   function openDoTModal(state, els) {
+    state.doTActiveTab = "list";
     renderDoTModal(state, els);
     if (els.doTModal) els.doTModal.hidden = false;
     if (els.doTSymbolInput) {
@@ -1527,7 +1551,7 @@
   function showReminderToast(state, els, item) {
     if (!els.reminderToasts) return;
     const toast = state.doc.createElement("article");
-    toast.className = "watch-reminder-toast";
+    toast.className = `watch-reminder-toast${item.source === "doT" ? " is-do-t" : ""}`;
     const title = item.source === "doT" ? `${item.name} 做T红灯预警` : item.source === "currentRed" ? `${item.name} 红灯预警` : `${item.name}有一条新的提醒被触发`;
     toast.innerHTML = `<div class="watch-reminder-toast-head"><strong>${escapeHtml(title)}</strong><button type="button" aria-label="关闭">×</button></div>
       <div class="watch-reminder-toast-body">
