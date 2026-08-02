@@ -1822,6 +1822,19 @@ svg {
   width: min(680px, calc(100vw - 32px));
 }
 
+.watch-dot-modal {
+  border-color: #93c5fd;
+  background: #eff6ff;
+}
+
+.watch-dot-modal .modal-header {
+  border-color: #bfdbfe;
+}
+
+.watch-dot-modal .modal-header h3 {
+  color: #1d4ed8;
+}
+
 .watch-reminder-content {
   display: grid;
   gap: 12px;
@@ -1933,6 +1946,18 @@ svg {
 
 .watch-dot-form button {
   height: 32px;
+}
+
+.watch-dot-columns {
+  display: grid;
+  grid-template-columns: minmax(320px, 1fr) minmax(320px, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.watch-dot-list-column,
+.watch-dot-history-column {
+  min-width: 0;
 }
 
 .watch-reminder-list,
@@ -2725,7 +2750,8 @@ svg {
   }
 
   .watch-reminder-content,
-  .watch-reminder-form {
+  .watch-reminder-form,
+  .watch-dot-columns {
     grid-template-columns: 1fr;
   }
 }

@@ -1371,10 +1371,15 @@
     if (els.reminderModal) els.reminderModal.hidden = false;
   }
 
+  function currentWatchSymbolInputText(state) {
+    if (!state || !state.symbol) return "";
+    const name = (state.quote && state.quote.symbol === state.symbol && state.quote.name) || (state.quoteNameCache && state.quoteNameCache[state.symbol]) || "";
+    return `${name ? `${name} ` : ""}${state.symbol.slice(2)}`;
+  }
+
   function openAddReminderModal(state, els) {
     if (els.reminderSymbolInput && state.symbol) {
-      const name = (state.quote && state.quote.symbol === state.symbol && state.quote.name) || (state.quoteNameCache && state.quoteNameCache[state.symbol]) || "";
-      els.reminderSymbolInput.value = `${name ? `${name} ` : ""}${state.symbol.slice(2)}`;
+      els.reminderSymbolInput.value = currentWatchSymbolInputText(state);
     }
     renderReminderFormFields(els);
     if (els.addReminderModal) els.addReminderModal.hidden = false;
@@ -1391,7 +1396,11 @@
   function openDoTModal(state, els) {
     renderDoTModal(state, els);
     if (els.doTModal) els.doTModal.hidden = false;
-    if (els.doTSymbolInput) els.doTSymbolInput.focus();
+    if (els.doTSymbolInput) {
+      els.doTSymbolInput.value = currentWatchSymbolInputText(state);
+      els.doTSymbolInput.focus();
+      els.doTSymbolInput.select();
+    }
   }
 
   function closeDoTModal(els) {
@@ -3415,6 +3424,7 @@
     addManagedCategoryForStorage,
     reminderFormConfigForType,
     normalizeReminderRules,
+    currentWatchSymbolInputText,
     evaluateReminderRule,
     collectReminderTriggers,
     normalizeDoTItems,

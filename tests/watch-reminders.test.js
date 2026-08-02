@@ -10,6 +10,8 @@ assert(watchHtml.includes('id="watchReminderButton"'), "watch page should place 
 assert(watchHtml.includes('id="watchReminderButton" class="watch-reminder-button" type="button">股票监督（0）</button>'), "watch reminder management button should be renamed to stock supervision");
 assert(watchHtml.includes('id="watchDoTButton"'), "watch page should include a separate do-T reminder button");
 assert(watchHtml.includes('id="watchDoTModal"'), "watch page should include a do-T reminder management modal");
+assert(watchHtml.includes('class="watch-reminder-modal watch-dot-modal"'), "do-T reminder modal should use its own blue theme class");
+assert(watchHtml.includes('class="watch-dot-columns"'), "do-T reminder modal should split stock list and trigger history into two columns");
 assert(!watchHtml.includes('id="watchRefreshButton"'), "watch page should remove the manual realtime refresh toggle");
 assert(watchHtml.includes('id="watchReminderModal"'), "watch page should include a reminder management modal");
 assert(watchHtml.includes('id="watchReminderRulesTab"'), "watch reminder management should use a rules tab");
@@ -25,7 +27,14 @@ assert.deepStrictEqual(watch.reminderFormConfigForType("ma").fields, ["maDirecti
 assert.deepStrictEqual(watch.reminderFormConfigForType("boll").fields, ["bollDirection", "bollLine"]);
 assert(watchCss.includes(".watch-reminder-section[hidden]"), "hidden reminder tab panels must not be forced visible by grid styles");
 assert(watchCss.includes("grid-template-columns: 1fr auto 1fr"), "watch reminder tabs should be centered with the add button on the right");
+assert(watchCss.includes(".watch-dot-modal"), "do-T modal should have distinct blue styling from stock supervision");
+assert(watchCss.includes(".watch-dot-columns"), "do-T modal should provide a two-column layout");
 assert.strictEqual(watch.normalizeSymbol("国睿科技 600562"), "sh600562", "reminder stock input should accept name plus code display text");
+assert.strictEqual(
+  watch.currentWatchSymbolInputText({ symbol: "sh600519", quote: { symbol: "sh600519", name: "贵州茅台" }, quoteNameCache: {} }),
+  "贵州茅台 600519",
+  "do-T add input should default to the currently displayed watch stock"
+);
 
 const normalized = watch.normalizeReminderRules([
   { symbol: "600519", conditionType: "priceAbove", targetPrice: "10.5" },

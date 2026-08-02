@@ -273,27 +273,29 @@
       </div>
 
       <div class="modal-backdrop" id="watchDoTModal" hidden>
-        <div class="watch-reminder-modal" role="dialog" aria-modal="true" aria-label="做T提醒">
+        <div class="watch-reminder-modal watch-dot-modal" role="dialog" aria-modal="true" aria-label="做T提醒">
           <div class="modal-header">
             <h3>做T提醒</h3>
             <button id="watchDoTCloseButton" type="button">关闭</button>
           </div>
           <div class="watch-reminder-content">
-            <div class="watch-dot-form">
-              <input id="watchDoTSymbolInput" type="text" placeholder="600519 / 贵州茅台 600519" aria-label="做T提醒股票代码" />
-              <button id="watchAddDoTButton" type="button">添加股票</button>
+            <div class="watch-dot-columns">
+              <section class="watch-reminder-section watch-dot-list-column">
+                <h4>股票列表</h4>
+                <div class="watch-dot-form">
+                  <input id="watchDoTSymbolInput" type="text" placeholder="600519 / 贵州茅台 600519" aria-label="做T提醒股票代码" />
+                  <button id="watchAddDoTButton" type="button">添加股票</button>
+                </div>
+                <div id="watchDoTList" class="watch-reminder-list"></div>
+              </section>
+              <section class="watch-reminder-section watch-dot-history-column">
+                <div class="watch-reminder-history-head">
+                  <h4>触发历史</h4>
+                  <button id="watchClearDoTHistoryButton" type="button">一键清空</button>
+                </div>
+                <div id="watchDoTHistoryList" class="watch-reminder-history"></div>
+              </section>
             </div>
-            <section class="watch-reminder-section">
-              <h4>监督股票</h4>
-              <div id="watchDoTList" class="watch-reminder-list"></div>
-            </section>
-            <section class="watch-reminder-section">
-              <div class="watch-reminder-history-head">
-                <h4>触发历史</h4>
-                <button id="watchClearDoTHistoryButton" type="button">一键清空</button>
-              </div>
-              <div id="watchDoTHistoryList" class="watch-reminder-history"></div>
-            </section>
           </div>
         </div>
       </div>
