@@ -53,7 +53,8 @@
           <input id="intradayEffectsToggle" type="checkbox" checked />
           <span>分时特效</span>
         </label>
-        <button id="watchReminderButton" class="watch-reminder-button" type="button">提醒管理（0）</button>
+        <button id="watchReminderButton" class="watch-reminder-button" type="button">股票监督（0）</button>
+        <button id="watchDoTButton" class="watch-reminder-button watch-dot-button" type="button">做T提醒（0）</button>
       </section>
 
       <div id="watchBannerModal" class="watch-banner-modal" hidden>
@@ -267,6 +268,32 @@
               </select>
             </label>
             <button id="watchAddReminderRuleButton" type="button">保存提醒</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-backdrop" id="watchDoTModal" hidden>
+        <div class="watch-reminder-modal" role="dialog" aria-modal="true" aria-label="做T提醒">
+          <div class="modal-header">
+            <h3>做T提醒</h3>
+            <button id="watchDoTCloseButton" type="button">关闭</button>
+          </div>
+          <div class="watch-reminder-content">
+            <div class="watch-dot-form">
+              <input id="watchDoTSymbolInput" type="text" placeholder="600519 / 贵州茅台 600519" aria-label="做T提醒股票代码" />
+              <button id="watchAddDoTButton" type="button">添加股票</button>
+            </div>
+            <section class="watch-reminder-section">
+              <h4>监督股票</h4>
+              <div id="watchDoTList" class="watch-reminder-list"></div>
+            </section>
+            <section class="watch-reminder-section">
+              <div class="watch-reminder-history-head">
+                <h4>触发历史</h4>
+                <button id="watchClearDoTHistoryButton" type="button">一键清空</button>
+              </div>
+              <div id="watchDoTHistoryList" class="watch-reminder-history"></div>
+            </section>
           </div>
         </div>
       </div>

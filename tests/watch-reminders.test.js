@@ -7,6 +7,9 @@ const watchHtml = fs.readFileSync(path.join(__dirname, "..", "watch.html"), "utf
 const watchCss = fs.readFileSync(path.join(__dirname, "..", "assets", "styles.css"), "utf8");
 
 assert(watchHtml.includes('id="watchReminderButton"'), "watch page should place reminder management where realtime refresh was");
+assert(watchHtml.includes('id="watchReminderButton" class="watch-reminder-button" type="button">股票监督（0）</button>'), "watch reminder management button should be renamed to stock supervision");
+assert(watchHtml.includes('id="watchDoTButton"'), "watch page should include a separate do-T reminder button");
+assert(watchHtml.includes('id="watchDoTModal"'), "watch page should include a do-T reminder management modal");
 assert(!watchHtml.includes('id="watchRefreshButton"'), "watch page should remove the manual realtime refresh toggle");
 assert(watchHtml.includes('id="watchReminderModal"'), "watch page should include a reminder management modal");
 assert(watchHtml.includes('id="watchReminderRulesTab"'), "watch reminder management should use a rules tab");
@@ -53,5 +56,44 @@ const reset = watch.collectReminderTriggers(rules, { sh600519: { ...quote, lates
 assert.strictEqual(reset.activeRuleIds.size, 0, "inactive condition should reset the trigger state");
 const disabled = watch.collectReminderTriggers([{ ...rules[0], enabled: false }], { sh600519: quote }, {}, new Set(), 4000);
 assert.strictEqual(disabled.triggered.length, 0, "disabled reminder rules should not trigger");
+
+const doTItems = watch.normalizeDoTItems([{ symbol: "600519" }, { symbol: "贵州茅台 600519" }, { symbol: "bad" }]);
+assert.deepStrictEqual(doTItems.map((item) => item.symbol), ["sh600519"], "do-T list should normalize and dedupe valid stock symbols");
+
+const doTRows = Array.from({ length: 30 }, (_, index) => ({
+  date: `2026-07-17 ${String(9 + Math.floor(index / 60)).padStart(2, "0")}:${String(30 + (index % 30)).padStart(2, "0")}`,
+  open: 10,
+  close: 10 + index * 0.1,
+  high: 10 + index * 0.1,
+  low: 9.5,
+  volume: 1000,
+}));
+const doTBollRows = Array.from({ length: 30 }, (_, index) => ({ date: `2026-07-${String(index + 1).padStart(2, "0")}`, open: 10, close: 10, high: 10, low: 10, volume: 1000 }));
+const doTFirst = watch.collectDoTTriggers(
+  [{ id: "dt1", symbol: "sh600519", enabled: true }],
+  { sh600519: { symbol: "sh600519", name: "贵州茅台", latestPrice: 12 } },
+  {
+    "sh600519:m1": doTRows,
+    "sh600519:m5": doTBollRows,
+    "sh600519:day": doTBollRows,
+  },
+  new Set(),
+  5000
+);
+assert.strictEqual(doTFirst.triggered.length, 1, "do-T monitor should trigger when at least two red lights are active");
+assert.strictEqual(doTFirst.triggered[0].source, "doT");
+assert.strictEqual(doTFirst.triggered[0].conditionText, "1分钟 KDJ>80、5分钟 突破BOLL、日K 突破BOLL");
+const doTSecond = watch.collectDoTTriggers(
+  [{ id: "dt1", symbol: "sh600519", enabled: true }],
+  { sh600519: { symbol: "sh600519", name: "贵州茅台", latestPrice: 12 } },
+  {
+    "sh600519:m1": doTRows,
+    "sh600519:m5": doTBollRows,
+    "sh600519:day": doTBollRows,
+  },
+  doTFirst.activeItemIds,
+  6000
+);
+assert.strictEqual(doTSecond.triggered.length, 0, "do-T monitor should not duplicate a continuously active stock alert");
 
 console.log("watch reminder tests passed");

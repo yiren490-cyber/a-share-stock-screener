@@ -1479,6 +1479,17 @@ svg {
   border-color: #1d4ed8;
 }
 
+.watch-dot-button {
+  min-width: 108px;
+  background: #0f766e;
+  border-color: #0f766e;
+}
+
+.watch-dot-button.is-active {
+  background: #b45309;
+  border-color: #b45309;
+}
+
 #enableSoundButton {
   background: #1d4ed8;
   border-color: #1d4ed8;
@@ -1907,6 +1918,21 @@ svg {
 .watch-reminder-form button {
   align-self: end;
   height: 30px;
+}
+
+.watch-dot-form {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.watch-dot-form input {
+  height: 32px;
+}
+
+.watch-dot-form button {
+  height: 32px;
 }
 
 .watch-reminder-list,

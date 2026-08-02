@@ -41,7 +41,14 @@
   const STOCK_NOTES_KEY = "stockWatchNotes";
   const REMINDER_RULES_KEY = "stockWatchReminderRules";
   const REMINDER_HISTORY_KEY = "stockWatchReminderHistory";
+  const DO_T_ITEMS_KEY = "stockWatchDoTItems";
   const REMINDER_CHECK_MS = 2000;
+  const RED_ALERT_LABELS = {
+    minuteKdj: "1分钟 KDJ>80",
+    intradayBlue: "分时 深蓝",
+    fiveMinuteBoll: "5分钟 突破BOLL",
+    dayBoll: "日K 突破BOLL",
+  };
   const NOTE_TYPES = [
     { key: "watch", label: "盯盘笔记" },
     { key: "trend", label: "K线趋势分析" },
@@ -224,6 +231,27 @@
       count,
       shouldPlay: count >= 2 && Number(data && data.previousCount) < 2,
     };
+  }
+
+  function activeRedAlertLabels(result) {
+    return Object.keys(RED_ALERT_LABELS).filter((key) => result && result[key]).map((key) => RED_ALERT_LABELS[key]);
+  }
+
+  function evaluateRedAlertSnapshot({ quote, m1Rows = [], m5Rows = [], dayRows = [], previousCount = 0 }) {
+    const m1 = latestTradingDayRows(m1Rows);
+    const m1Kdj = calculateKdj(m1).at(-1) || {};
+    const intradayTrend = calculateIntradayTrendStates(m1).at(-1) || {};
+    const m5Boll = calculateBoll(m5Rows).at(-1) || {};
+    const dayBoll = calculateBoll(dayRows).at(-1) || {};
+    const realtimePrice = quote && quote.latestPrice;
+    const result = evaluateAlerts({
+      previousCount,
+      minuteKdj: m1Kdj,
+      intradayTrend,
+      fiveMinute: { price: realtimePrice || (m5Rows.at(-1) && m5Rows.at(-1).close), upper: m5Boll.ub },
+      day: { price: realtimePrice || (dayRows.at(-1) && dayRows.at(-1).close), upper: dayBoll.ub },
+    });
+    return { ...result, labels: activeRedAlertLabels(result) };
   }
 
   function tradingSessionTicks() {
@@ -633,6 +661,7 @@
           name: String(item.name || symbol).trim() || symbol,
           conditionText: String(item.conditionText || "").trim(),
           price: finiteNumber(item.price),
+          source: item.source === "doT" || item.source === "currentRed" ? item.source : "reminder",
           triggeredAt,
         };
       })
@@ -650,6 +679,67 @@
 
   function saveReminderHistory(storage, history) {
     if (storage) storage.setItem(REMINDER_HISTORY_KEY, JSON.stringify(normalizeReminderHistory(history)));
+  }
+
+  function normalizeDoTItems(items) {
+    const seen = new Set();
+    return (Array.isArray(items) ? items : [])
+      .map((item) => {
+        const symbol = normalizeSymbol(typeof item === "string" ? item : item && item.symbol);
+        if (!symbol || seen.has(symbol)) return null;
+        seen.add(symbol);
+        return {
+          id: String((item && item.id) || `dot-${symbol}`),
+          symbol,
+          enabled: !item || item.enabled !== false,
+          createdAt: Number(item && item.createdAt) || Date.now(),
+        };
+      })
+      .filter(Boolean);
+  }
+
+  function readDoTItems(storage) {
+    try {
+      return normalizeDoTItems(JSON.parse((storage && storage.getItem(DO_T_ITEMS_KEY)) || "[]"));
+    } catch (_) {
+      return [];
+    }
+  }
+
+  function saveDoTItems(storage, items) {
+    if (storage) storage.setItem(DO_T_ITEMS_KEY, JSON.stringify(normalizeDoTItems(items)));
+  }
+
+  function collectDoTTriggers(items, quotesBySymbol, klineByKey, activeItemIds, now = Date.now()) {
+    const previousActive = activeItemIds instanceof Set ? activeItemIds : new Set(activeItemIds || []);
+    const nextActiveItemIds = new Set();
+    const triggered = [];
+    normalizeDoTItems(items)
+      .filter((item) => item.enabled)
+      .forEach((item) => {
+        const quote = quotesBySymbol && quotesBySymbol[item.symbol];
+        if (!quote) return;
+        const snapshot = evaluateRedAlertSnapshot({
+          quote,
+          m1Rows: (klineByKey && klineByKey[`${item.symbol}:m1`]) || [],
+          m5Rows: (klineByKey && klineByKey[`${item.symbol}:m5`]) || [],
+          dayRows: (klineByKey && klineByKey[`${item.symbol}:day`]) || [],
+        });
+        if (snapshot.count < 2) return;
+        nextActiveItemIds.add(item.id);
+        if (previousActive.has(item.id)) return;
+        triggered.push({
+          id: makeReminderId(),
+          ruleId: item.id,
+          source: "doT",
+          symbol: item.symbol,
+          name: (quote && quote.name) || item.symbol,
+          conditionText: snapshot.labels.join("、"),
+          price: finiteNumber(quote && quote.latestPrice),
+          triggeredAt: now,
+        });
+      });
+    return { triggered, activeItemIds: nextActiveItemIds };
   }
 
   function reminderNeedsKline(rule) {
@@ -828,6 +918,8 @@
       notesBySymbol: readStockNotes(root.localStorage),
       reminderRules: readReminderRules(root.localStorage),
       reminderHistory: readReminderHistory(root.localStorage),
+      doTItems: readDoTItems(root.localStorage),
+      doTActiveItemIds: new Set(),
       reminderTimer: null,
       reminderActiveRuleIds: new Set(),
       reminderActiveTab: "rules",
@@ -851,6 +943,8 @@
     renderIntradayEffectsToggle(state, els);
     renderReminderButton(state, els);
     renderReminderModal(state, els);
+    renderDoTButton(state, els);
+    renderDoTModal(state, els);
     bindWatchEvents(state, els);
     startReminderMonitor(state, els);
     state.audioReadyPromise = loadStoredAudio(state, els);
@@ -865,6 +959,14 @@
       searchHistory: doc.getElementById("watchSearchHistory"),
       loadButton: doc.getElementById("watchLoadButton"),
       reminderButton: doc.getElementById("watchReminderButton"),
+      doTButton: doc.getElementById("watchDoTButton"),
+      doTModal: doc.getElementById("watchDoTModal"),
+      doTCloseButton: doc.getElementById("watchDoTCloseButton"),
+      doTSymbolInput: doc.getElementById("watchDoTSymbolInput"),
+      addDoTButton: doc.getElementById("watchAddDoTButton"),
+      doTList: doc.getElementById("watchDoTList"),
+      doTHistoryList: doc.getElementById("watchDoTHistoryList"),
+      clearDoTHistoryButton: doc.getElementById("watchClearDoTHistoryButton"),
       reminderModal: doc.getElementById("watchReminderModal"),
       reminderCloseButton: doc.getElementById("watchReminderCloseButton"),
       addReminderModal: doc.getElementById("watchAddReminderModal"),
@@ -951,6 +1053,36 @@
       if (event.key === "Enter") loadFromInput(state, els);
     });
     if (els.reminderButton) els.reminderButton.addEventListener("click", () => openReminderModal(state, els, "rules"));
+    if (els.doTButton) els.doTButton.addEventListener("click", () => openDoTModal(state, els));
+    if (els.doTCloseButton) els.doTCloseButton.addEventListener("click", () => closeDoTModal(els));
+    if (els.doTModal) {
+      els.doTModal.addEventListener("click", (event) => {
+        if (event.target === els.doTModal) closeDoTModal(els);
+      });
+    }
+    if (els.addDoTButton) els.addDoTButton.addEventListener("click", () => addDoTItemFromInput(state, els));
+    if (els.doTSymbolInput) {
+      els.doTSymbolInput.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") addDoTItemFromInput(state, els);
+      });
+    }
+    if (els.clearDoTHistoryButton) els.clearDoTHistoryButton.addEventListener("click", () => clearDoTHistory(state, els));
+    if (els.doTList) {
+      els.doTList.addEventListener("change", (event) => {
+        const checkbox = event.target.closest("[data-dot-enabled]");
+        if (checkbox) toggleDoTItem(state, els, checkbox.dataset.dotEnabled, checkbox.checked);
+      });
+      els.doTList.addEventListener("click", (event) => {
+        const deleteButton = event.target.closest("[data-delete-dot-item]");
+        if (deleteButton) deleteDoTItem(state, els, deleteButton.dataset.deleteDotItem);
+      });
+    }
+    if (els.doTHistoryList) {
+      els.doTHistoryList.addEventListener("click", (event) => {
+        const deleteButton = event.target.closest("[data-delete-reminder-history]");
+        if (deleteButton) deleteReminderHistoryItem(state, els, deleteButton.dataset.deleteReminderHistory);
+      });
+    }
     if (els.reminderCloseButton) els.reminderCloseButton.addEventListener("click", () => closeReminderModal(els));
     if (els.reminderModal) {
       els.reminderModal.addEventListener("click", (event) => {
@@ -1143,8 +1275,15 @@
   function renderReminderButton(state, els) {
     if (!els.reminderButton) return;
     const count = normalizeReminderRules(state.reminderRules).filter((rule) => rule.enabled).length;
-    els.reminderButton.textContent = `提醒管理（${count}）`;
+    els.reminderButton.textContent = `股票监督（${count}）`;
     els.reminderButton.classList.toggle("is-active", count > 0);
+  }
+
+  function renderDoTButton(state, els) {
+    if (!els.doTButton) return;
+    const count = normalizeDoTItems(state.doTItems).filter((item) => item.enabled).length;
+    els.doTButton.textContent = `做T提醒（${count}）`;
+    els.doTButton.classList.toggle("is-active", count > 0);
   }
 
   function renderReminderModal(state, els) {
@@ -1152,6 +1291,12 @@
     renderReminderHistory(state, els);
     renderReminderButton(state, els);
     setReminderTab(state, els, state.reminderActiveTab);
+  }
+
+  function renderDoTModal(state, els) {
+    renderDoTItems(state, els);
+    renderDoTHistory(state, els);
+    renderDoTButton(state, els);
   }
 
   function reminderStockLabel(state, rule) {
@@ -1179,10 +1324,10 @@
     return date.toLocaleString("zh-CN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" });
   }
 
-  function renderReminderHistory(state, els) {
-    if (!els.reminderHistoryList) return;
-    const history = normalizeReminderHistory(state.reminderHistory);
-    els.reminderHistoryList.innerHTML = history.length
+  function renderReminderHistoryItems(node, historyItems, emptyText) {
+    if (!node) return;
+    const history = normalizeReminderHistory(historyItems);
+    node.innerHTML = history.length
       ? history
           .map(
             (item) => `<article class="watch-reminder-history-item">
@@ -1196,7 +1341,28 @@
             </article>`
           )
           .join("")
-      : '<p class="empty-note">暂无触发历史</p>';
+      : `<p class="empty-note">${escapeHtml(emptyText)}</p>`;
+  }
+
+  function renderReminderHistory(state, els) {
+    renderReminderHistoryItems(els.reminderHistoryList, normalizeReminderHistory(state.reminderHistory).filter((item) => item.source !== "doT"), "暂无触发历史");
+  }
+
+  function renderDoTItems(state, els) {
+    if (!els.doTList) return;
+    const items = normalizeDoTItems(state.doTItems);
+    els.doTList.innerHTML = items.length
+      ? items
+          .map((item) => {
+            const name = (state.quoteNameCache && state.quoteNameCache[item.symbol]) || "";
+            return `<article class="watch-reminder-rule"><strong>${escapeHtml(name ? `${name} ${item.symbol.slice(2)}` : item.symbol.slice(2))}</strong><span>4个红灯满足至少2个时提醒</span><div class="watch-reminder-rule-actions"><label><input type="checkbox" data-dot-enabled="${escapeHtml(item.id)}" ${item.enabled ? "checked" : ""} /> 启用</label><button type="button" data-delete-dot-item="${escapeHtml(item.id)}">删除股票</button></div></article>`;
+          })
+          .join("")
+      : '<p class="empty-note">暂无做T监督股票</p>';
+  }
+
+  function renderDoTHistory(state, els) {
+    renderReminderHistoryItems(els.doTHistoryList, normalizeReminderHistory(state.reminderHistory).filter((item) => item.source === "doT"), "暂无做T触发历史");
   }
 
   function openReminderModal(state, els, tab = "rules") {
@@ -1220,6 +1386,53 @@
 
   function closeReminderModal(els) {
     if (els.reminderModal) els.reminderModal.hidden = true;
+  }
+
+  function openDoTModal(state, els) {
+    renderDoTModal(state, els);
+    if (els.doTModal) els.doTModal.hidden = false;
+    if (els.doTSymbolInput) els.doTSymbolInput.focus();
+  }
+
+  function closeDoTModal(els) {
+    if (els.doTModal) els.doTModal.hidden = true;
+  }
+
+  function addDoTItemFromInput(state, els) {
+    const symbol = normalizeSymbol(els.doTSymbolInput && els.doTSymbolInput.value);
+    if (!symbol) {
+      setStatus(els, "请填写正确的做T提醒股票代码。");
+      return;
+    }
+    state.doTItems = normalizeDoTItems([{ symbol, enabled: true, createdAt: Date.now() }, ...state.doTItems]);
+    saveDoTItems(root.localStorage, state.doTItems);
+    if (els.doTSymbolInput) els.doTSymbolInput.value = "";
+    renderDoTModal(state, els);
+    hydrateCategoryNames(state, els);
+    setStatus(els, `已添加做T提醒：${symbol.slice(2)}`);
+  }
+
+  function toggleDoTItem(state, els, id, enabled) {
+    state.doTItems = normalizeDoTItems(state.doTItems).map((item) => (item.id === id ? { ...item, enabled: Boolean(enabled) } : item));
+    if (!enabled) state.doTActiveItemIds.delete(id);
+    saveDoTItems(root.localStorage, state.doTItems);
+    syncAlertLoop(state, els);
+    renderDoTModal(state, els);
+  }
+
+  function deleteDoTItem(state, els, id) {
+    state.doTItems = normalizeDoTItems(state.doTItems).filter((item) => item.id !== id);
+    state.doTActiveItemIds.delete(id);
+    saveDoTItems(root.localStorage, state.doTItems);
+    syncAlertLoop(state, els);
+    renderDoTModal(state, els);
+  }
+
+  function clearDoTHistory(state, els) {
+    state.reminderHistory = normalizeReminderHistory(state.reminderHistory).filter((item) => item.source !== "doT");
+    saveReminderHistory(root.localStorage, state.reminderHistory);
+    renderReminderHistory(state, els);
+    renderDoTHistory(state, els);
   }
 
   function reminderConditionTypeFromForm(els) {
@@ -1286,12 +1499,14 @@
     state.reminderHistory = normalizeReminderHistory(state.reminderHistory).filter((item) => item.id !== id);
     saveReminderHistory(root.localStorage, state.reminderHistory);
     renderReminderHistory(state, els);
+    renderDoTHistory(state, els);
   }
 
   function clearReminderHistory(state, els) {
-    state.reminderHistory = [];
+    state.reminderHistory = normalizeReminderHistory(state.reminderHistory).filter((item) => item.source === "doT");
     saveReminderHistory(root.localStorage, state.reminderHistory);
     renderReminderHistory(state, els);
+    renderDoTHistory(state, els);
   }
 
   function raiseReminderToast(state, toast) {
@@ -1304,7 +1519,8 @@
     if (!els.reminderToasts) return;
     const toast = state.doc.createElement("article");
     toast.className = "watch-reminder-toast";
-    toast.innerHTML = `<div class="watch-reminder-toast-head"><strong>${escapeHtml(item.name)}有一条新的提醒被触发</strong><button type="button" aria-label="关闭">×</button></div>
+    const title = item.source === "doT" ? `${item.name} 做T红灯预警` : item.source === "currentRed" ? `${item.name} 红灯预警` : `${item.name}有一条新的提醒被触发`;
+    toast.innerHTML = `<div class="watch-reminder-toast-head"><strong>${escapeHtml(title)}</strong><button type="button" aria-label="关闭">×</button></div>
       <div class="watch-reminder-toast-body">
         <span>${escapeHtml(item.conditionText)}，触发价格 ${escapeHtml(formatNumber(item.price))}</span>
         <button type="button" data-view-reminders>查看全部提醒</button>
@@ -1319,7 +1535,12 @@
       });
     }
     const viewButton = toast.querySelector("[data-view-reminders]");
-    if (viewButton) viewButton.addEventListener("click", () => openReminderModal(state, els, "history"));
+    if (viewButton) {
+      viewButton.addEventListener("click", () => {
+        if (item.source === "doT") openDoTModal(state, els);
+        else openReminderModal(state, els, "history");
+      });
+    }
     els.reminderToasts.appendChild(toast);
   }
 
@@ -1331,20 +1552,25 @@
   async function checkReminders(state, els) {
     if (state.reminderChecking) return;
     const rules = normalizeReminderRules(state.reminderRules).filter((rule) => rule.enabled);
-    if (!rules.length) {
+    const doTItems = normalizeDoTItems(state.doTItems).filter((item) => item.enabled && item.symbol !== state.symbol);
+    if (!rules.length && !doTItems.length) {
       state.reminderActiveRuleIds = new Set();
+      state.doTActiveItemIds = new Set();
+      syncAlertLoop(state, els);
       renderReminderButton(state, els);
+      renderDoTButton(state, els);
       return;
     }
     state.reminderChecking = true;
     try {
-      const symbols = [...new Set(rules.map((rule) => rule.symbol))];
+      const symbols = [...new Set([...rules.map((rule) => rule.symbol), ...doTItems.map((item) => item.symbol)])];
       const quotes = await fetchQuotes(symbols);
       const quotesBySymbol = Object.fromEntries(quotes.map((quote) => [quote.symbol, quote]));
       const klineByKey = {};
       const klineRules = rules.filter(reminderNeedsKline);
+      const doTKlineKeys = doTItems.flatMap((item) => [`${item.symbol}:m1`, `${item.symbol}:m5`, `${item.symbol}:day`]);
       await Promise.all(
-        [...new Set(klineRules.map(reminderKlineKey))].map(async (key) => {
+        [...new Set([...klineRules.map(reminderKlineKey), ...doTKlineKeys])].map(async (key) => {
           const [symbol, period] = key.split(":");
           try {
             klineByKey[key] = await fetchKline(symbol, period);
@@ -1355,12 +1581,21 @@
       );
       const result = collectReminderTriggers(rules, quotesBySymbol, klineByKey, state.reminderActiveRuleIds, Date.now());
       state.reminderActiveRuleIds = result.activeRuleIds;
-      if (result.triggered.length) {
-        state.reminderHistory = normalizeReminderHistory([...result.triggered, ...state.reminderHistory]);
+      const doTResult = collectDoTTriggers(doTItems, quotesBySymbol, klineByKey, state.doTActiveItemIds, Date.now());
+      state.doTActiveItemIds = doTResult.activeItemIds;
+      const triggered = [...result.triggered, ...doTResult.triggered];
+      if (triggered.length) {
+        quotes.forEach((quote) => {
+          if (quote && quote.symbol && quote.name) state.quoteNameCache[quote.symbol] = quote.name;
+        });
+        saveQuoteNameCache(root.localStorage, state.quoteNameCache);
+        state.reminderHistory = normalizeReminderHistory([...triggered, ...state.reminderHistory]);
         saveReminderHistory(root.localStorage, state.reminderHistory);
         renderReminderModal(state, els);
-        result.triggered.forEach((item) => showReminderToast(state, els, item));
+        renderDoTModal(state, els);
+        triggered.forEach((item) => showReminderToast(state, els, item));
       }
+      syncAlertLoop(state, els);
     } finally {
       state.reminderChecking = false;
     }
@@ -1427,9 +1662,13 @@
     return item ? item.text : "";
   }
 
+  function hasAnyAlertActive(state) {
+    return Boolean(state && (Number(state.previousAlertCount) >= 2 || (state.doTActiveItemIds && state.doTActiveItemIds.size > 0)));
+  }
+
   function resolveBannerDisplay(state) {
     const alertText = selectedBannerText(state);
-    if (state && state.soundEnabled && state.previousAlertCount >= 2 && alertText) return { text: alertText, mode: "alert" };
+    if (state && state.soundEnabled && hasAnyAlertActive(state) && alertText) return { text: alertText, mode: "alert" };
     const defaultText = String((state && state.defaultBannerText) || "").trim();
     return defaultText ? { text: defaultText, mode: "default" } : { text: "", mode: "" };
   }
@@ -1999,7 +2238,12 @@
   }
 
   async function hydrateCategoryNames(state, els) {
-    const symbols = [...new Set(Object.values(state.categories).flat().map(normalizeSymbol).filter(Boolean))];
+    const symbols = [
+      ...new Set([
+        ...Object.values(state.categories).flat().map(normalizeSymbol).filter(Boolean),
+        ...normalizeDoTItems(state.doTItems).map((item) => item.symbol),
+      ]),
+    ];
     const missing = symbols.filter((symbol) => !state.quoteNameCache[symbol]);
     if (!missing.length) return;
     try {
@@ -2014,6 +2258,7 @@
       if (changed) {
         saveQuoteNameCache(root.localStorage, state.quoteNameCache);
         renderCategories(state, els);
+        renderDoTItems(state, els);
       }
     } catch (_) {
       // Names will be filled when individual quotes load.
@@ -2029,8 +2274,7 @@
     state.quote = null;
     state.klineByPeriod = {};
     state.previousAlertCount = 0;
-    stopAlertLoop(state);
-    updateAlertBanner(state, els);
+    syncAlertLoop(state, els);
     hideNotesPreview(els);
     if (els.notesModal) els.notesModal.hidden = true;
     updateNotesButtonState(state, els);
@@ -2815,33 +3059,40 @@
   }
 
   function updateAlerts(state, els) {
+    const previousCount = state.previousAlertCount;
     const m1 = latestTradingDayRows(state.klineByPeriod.m1 || []);
     const m5 = state.klineByPeriod.m5 || [];
     const day = state.klineByPeriod.day || [];
-    const m1Kdj = calculateKdj(m1).at(-1) || {};
-    const intradayTrend = calculateIntradayTrendStates(m1).at(-1) || {};
-    const m5Boll = calculateBoll(m5).at(-1) || {};
-    const dayBoll = calculateBoll(day).at(-1) || {};
-    const realtimePrice = state.quote && state.quote.latestPrice;
-    const result = evaluateAlerts({
-      previousCount: state.previousAlertCount,
-      minuteKdj: m1Kdj,
-      intradayTrend,
-      fiveMinute: { price: realtimePrice || (m5.at(-1) && m5.at(-1).close), upper: m5Boll.ub },
-      day: { price: realtimePrice || (day.at(-1) && day.at(-1).close), upper: dayBoll.ub },
+    const result = evaluateRedAlertSnapshot({
+      quote: state.quote,
+      m1Rows: m1,
+      m5Rows: m5,
+      dayRows: day,
+      previousCount,
     });
     Object.entries({ minuteKdj: result.minuteKdj, intradayBlue: result.intradayBlue, fiveMinuteBoll: result.fiveMinuteBoll, dayBoll: result.dayBoll }).forEach(([key, active]) => {
       const node = els.alertLights.querySelector(`[data-alert="${key}"]`);
       if (node) node.classList.toggle("is-on", active);
     });
     updateStopAlertLights(els, calculateStopWarningLevels(day, state.quote), state.intradayEffectsEnabled);
-    if (result.count >= 2) {
-      startAlertLoop(state);
-    } else {
-      stopAlertLoop(state);
+    if (result.count >= 2 && previousCount < 2 && state.quote) {
+      const item = {
+        id: makeReminderId(),
+        ruleId: "current-red-alert",
+        source: "currentRed",
+        symbol: state.symbol,
+        name: state.quote.name || state.symbol,
+        conditionText: result.labels.join("、"),
+        price: finiteNumber(state.quote.latestPrice),
+        triggeredAt: Date.now(),
+      };
+      state.reminderHistory = normalizeReminderHistory([item, ...state.reminderHistory]);
+      saveReminderHistory(root.localStorage, state.reminderHistory);
+      renderReminderHistory(state, els);
+      showReminderToast(state, els, item);
     }
     state.previousAlertCount = result.count;
-    updateAlertBanner(state, els);
+    syncAlertLoop(state, els);
   }
 
   function updateStopAlertLights(els, levels, intradayEffectsEnabled = true) {
@@ -2886,12 +3137,17 @@
     state.soundEnabled = Boolean(enabled);
     saveSoundEnabled(root.localStorage, state.soundEnabled);
     renderSoundButton(state, els);
+    syncAlertLoop(state, els);
+  }
+
+  function syncAlertLoop(state, els) {
     if (!state.soundEnabled) {
       stopAlertLoop(state);
       updateAlertBanner(state, els);
       return;
     }
-    if (state.previousAlertCount >= 2) startAlertLoop(state);
+    if (hasAnyAlertActive(state)) startAlertLoop(state);
+    else stopAlertLoop(state);
     updateAlertBanner(state, els);
   }
 
@@ -2970,7 +3226,7 @@
       state.audioItems = mergeAudioItems([...state.audioItems, ...savedItems]);
       selectAlertAudio(state, els, savedItems[savedItems.length - 1].id);
     }
-    if (wasLooping || (state.soundEnabled && state.previousAlertCount >= 2)) startAlertLoop(state);
+    if (wasLooping || (state.soundEnabled && hasAnyAlertActive(state))) startAlertLoop(state);
     updateStoredAudioMarker(state, els);
   }
 
@@ -3076,7 +3332,7 @@
     state.audioItems = state.audioItems.filter((item) => item.id !== id);
     const nextId = (state.audioItems[0] && state.audioItems[0].id) || "";
     selectAlertAudio(state, els, nextId);
-    if (wasLooping || (state.soundEnabled && state.previousAlertCount >= 2)) startAlertLoop(state);
+    if (wasLooping || (state.soundEnabled && hasAnyAlertActive(state))) startAlertLoop(state);
   }
 
   function renderAudioPicker(state, els) {
@@ -3161,10 +3417,13 @@
     normalizeReminderRules,
     evaluateReminderRule,
     collectReminderTriggers,
+    normalizeDoTItems,
+    collectDoTTriggers,
     makeCategoryNavigator,
     defaultPanelSettings,
     mergePanelSettings,
     evaluateAlerts,
+    evaluateRedAlertSnapshot,
     calculateStopWarningLevels,
     calculateStopRiskLevel,
     tradingSessionTicks,
