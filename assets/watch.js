@@ -1548,11 +1548,25 @@
     toast.style.zIndex = String(state.reminderToastZ);
   }
 
+  function isRedAlertToast(item) {
+    return item && (item.source === "doT" || item.source === "currentRed");
+  }
+
+  function reminderToastClassName(item) {
+    return `watch-reminder-toast${isRedAlertToast(item) ? " is-red-alert" : ""}`;
+  }
+
+  function reminderToastTitle(item) {
+    const name = (item && item.name) || (item && item.symbol) || "股票";
+    if (isRedAlertToast(item)) return `${name} 红灯做T提醒`;
+    return `${name}有一条新的提醒被触发`;
+  }
+
   function showReminderToast(state, els, item) {
     if (!els.reminderToasts) return;
     const toast = state.doc.createElement("article");
-    toast.className = `watch-reminder-toast${item.source === "doT" ? " is-do-t" : ""}`;
-    const title = item.source === "doT" ? `${item.name} 做T红灯预警` : item.source === "currentRed" ? `${item.name} 红灯预警` : `${item.name}有一条新的提醒被触发`;
+    toast.className = reminderToastClassName(item);
+    const title = reminderToastTitle(item);
     toast.innerHTML = `<div class="watch-reminder-toast-head"><strong>${escapeHtml(title)}</strong><button type="button" aria-label="关闭">×</button></div>
       <div class="watch-reminder-toast-body">
         <span>${escapeHtml(item.conditionText)}，触发价格 ${escapeHtml(formatNumber(item.price))}</span>
@@ -3449,6 +3463,8 @@
     reminderFormConfigForType,
     normalizeReminderRules,
     currentWatchSymbolInputText,
+    reminderToastClassName,
+    reminderToastTitle,
     evaluateReminderRule,
     collectReminderTriggers,
     normalizeDoTItems,

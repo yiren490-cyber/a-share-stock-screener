@@ -31,13 +31,17 @@ assert.deepStrictEqual(watch.reminderFormConfigForType("boll").fields, ["bollDir
 assert(watchCss.includes(".watch-reminder-section[hidden]"), "hidden reminder tab panels must not be forced visible by grid styles");
 assert(watchCss.includes("grid-template-columns: 1fr auto 1fr"), "watch reminder tabs should be centered with the add button on the right");
 assert(!watchCss.includes(".watch-dot-modal"), "do-T management modal should keep the same neutral rule-management surface");
-assert(watchCss.includes(".watch-reminder-toast.is-do-t"), "do-T alert popup should use distinct blue styling");
+assert(watchCss.includes(".watch-reminder-toast.is-red-alert"), "red-light alert popup should use distinct blue styling");
 assert.strictEqual(watch.normalizeSymbol("国睿科技 600562"), "sh600562", "reminder stock input should accept name plus code display text");
 assert.strictEqual(
   watch.currentWatchSymbolInputText({ symbol: "sh600519", quote: { symbol: "sh600519", name: "贵州茅台" }, quoteNameCache: {} }),
   "贵州茅台 600519",
   "do-T add input should default to the currently displayed watch stock"
 );
+assert.strictEqual(watch.reminderToastTitle({ source: "doT", name: "贵州茅台" }), "贵州茅台 红灯做T提醒", "do-T red-light toast should use the unified red alert title");
+assert.strictEqual(watch.reminderToastTitle({ source: "currentRed", name: "贵州茅台" }), "贵州茅台 红灯做T提醒", "current watch red-light toast should use the unified red alert title");
+assert(watch.reminderToastClassName({ source: "doT" }).includes("is-red-alert"), "do-T red-light toast should use blue alert styling");
+assert(watch.reminderToastClassName({ source: "currentRed" }).includes("is-red-alert"), "current watch red-light toast should use blue alert styling");
 
 const normalized = watch.normalizeReminderRules([
   { symbol: "600519", conditionType: "priceAbove", targetPrice: "10.5" },
