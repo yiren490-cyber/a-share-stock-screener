@@ -88,13 +88,14 @@ const doTRows = Array.from({ length: 30 }, (_, index) => ({
   volume: 1000,
 }));
 const doTBollRows = Array.from({ length: 30 }, (_, index) => ({ date: `2026-07-${String(index + 1).padStart(2, "0")}`, open: 10, close: 10, high: 10, low: 10, volume: 1000 }));
+const doTBreakBollRows = doTBollRows.map((row, index) => (index === doTBollRows.length - 1 ? { ...row, close: 12, high: 12.5 } : row));
 const doTFirst = watch.collectDoTTriggers(
   [{ id: "dt1", symbol: "sh600519", enabled: true }],
   { sh600519: { symbol: "sh600519", name: "贵州茅台", latestPrice: 12 } },
   {
     "sh600519:m1": doTRows,
-    "sh600519:m5": doTBollRows,
-    "sh600519:day": doTBollRows,
+    "sh600519:m5": doTBreakBollRows,
+    "sh600519:day": doTBreakBollRows,
   },
   new Set(),
   5000
@@ -107,20 +108,32 @@ const incompleteDoT = watch.collectDoTTriggers(
   { sh600519: { symbol: "sh600519", name: "贵州茅台", latestPrice: 12 } },
   {
     "sh600519:m1": [],
-    "sh600519:m5": doTBollRows,
-    "sh600519:day": doTBollRows,
+    "sh600519:m5": doTBreakBollRows,
+    "sh600519:day": doTBreakBollRows,
   },
   new Set(),
   5500
 );
 assert.strictEqual(incompleteDoT.triggered.length, 0, "do-T monitor should not trigger while required red-light data is incomplete");
+const doTNoClosedBollBreak = watch.collectDoTTriggers(
+  [{ id: "dt-no-close-break", symbol: "sh600519", enabled: true }],
+  { sh600519: { symbol: "sh600519", name: "贵州茅台", latestPrice: 12 } },
+  {
+    "sh600519:m1": doTBollRows.map((row, index) => ({ ...row, date: `2026-07-17 10:${String(index).padStart(2, "0")}`, high: 10.5, low: 9.5, close: 10 })),
+    "sh600519:m5": doTBollRows,
+    "sh600519:day": doTBollRows,
+  },
+  new Set(),
+  5600
+);
+assert.strictEqual(doTNoClosedBollBreak.triggered.length, 0, "do-T monitor should not trigger BOLL red lights from realtime price when K-line close has not broken BOLL");
 const doTSecond = watch.collectDoTTriggers(
   [{ id: "dt1", symbol: "sh600519", enabled: true }],
   { sh600519: { symbol: "sh600519", name: "贵州茅台", latestPrice: 12 } },
   {
     "sh600519:m1": doTRows,
-    "sh600519:m5": doTBollRows,
-    "sh600519:day": doTBollRows,
+    "sh600519:m5": doTBreakBollRows,
+    "sh600519:day": doTBreakBollRows,
   },
   doTFirst.activeItemIds,
   6000

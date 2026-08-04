@@ -243,13 +243,12 @@
     const intradayTrend = calculateIntradayTrendStates(m1).at(-1) || {};
     const m5Boll = calculateBoll(m5Rows).at(-1) || {};
     const dayBoll = calculateBoll(dayRows).at(-1) || {};
-    const realtimePrice = quote && quote.latestPrice;
     const result = evaluateAlerts({
       previousCount,
       minuteKdj: m1Kdj,
       intradayTrend,
-      fiveMinute: { price: realtimePrice || (m5Rows.at(-1) && m5Rows.at(-1).close), upper: m5Boll.ub },
-      day: { price: realtimePrice || (dayRows.at(-1) && dayRows.at(-1).close), upper: dayBoll.ub },
+      fiveMinute: { price: m5Rows.at(-1) && m5Rows.at(-1).close, upper: m5Boll.ub },
+      day: { price: dayRows.at(-1) && dayRows.at(-1).close, upper: dayBoll.ub },
     });
     return { ...result, labels: activeRedAlertLabels(result) };
   }
