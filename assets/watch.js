@@ -710,6 +710,10 @@
     if (storage) storage.setItem(DO_T_ITEMS_KEY, JSON.stringify(normalizeDoTItems(items)));
   }
 
+  function hasCompleteDoTRedAlertData({ m1Rows = [], m5Rows = [], dayRows = [] }) {
+    return latestTradingDayRows(m1Rows).length >= 9 && m5Rows.length >= 20 && dayRows.length >= 20;
+  }
+
   function collectDoTTriggers(items, quotesBySymbol, klineByKey, activeItemIds, now = Date.now()) {
     const previousActive = activeItemIds instanceof Set ? activeItemIds : new Set(activeItemIds || []);
     const nextActiveItemIds = new Set();
@@ -719,11 +723,15 @@
       .forEach((item) => {
         const quote = quotesBySymbol && quotesBySymbol[item.symbol];
         if (!quote) return;
+        const m1Rows = (klineByKey && klineByKey[`${item.symbol}:m1`]) || [];
+        const m5Rows = (klineByKey && klineByKey[`${item.symbol}:m5`]) || [];
+        const dayRows = (klineByKey && klineByKey[`${item.symbol}:day`]) || [];
+        if (!hasCompleteDoTRedAlertData({ m1Rows, m5Rows, dayRows })) return;
         const snapshot = evaluateRedAlertSnapshot({
           quote,
-          m1Rows: (klineByKey && klineByKey[`${item.symbol}:m1`]) || [],
-          m5Rows: (klineByKey && klineByKey[`${item.symbol}:m5`]) || [],
-          dayRows: (klineByKey && klineByKey[`${item.symbol}:day`]) || [],
+          m1Rows,
+          m5Rows,
+          dayRows,
         });
         if (snapshot.count < 2) return;
         nextActiveItemIds.add(item.id);
@@ -1367,8 +1375,16 @@
       : `<p class="empty-note">${escapeHtml(emptyText)}</p>`;
   }
 
+  function isRedAlertHistoryItem(item) {
+    return item && (item.source === "doT" || item.source === "currentRed");
+  }
+
+  function isCustomReminderHistoryItem(item) {
+    return !isRedAlertHistoryItem(item);
+  }
+
   function renderReminderHistory(state, els) {
-    renderReminderHistoryItems(els.reminderHistoryList, normalizeReminderHistory(state.reminderHistory).filter((item) => item.source !== "doT"), "暂无触发历史");
+    renderReminderHistoryItems(els.reminderHistoryList, normalizeReminderHistory(state.reminderHistory).filter(isCustomReminderHistoryItem), "暂无触发历史");
   }
 
   function renderDoTItems(state, els) {
@@ -1385,7 +1401,7 @@
   }
 
   function renderDoTHistory(state, els) {
-    renderReminderHistoryItems(els.doTHistoryList, normalizeReminderHistory(state.reminderHistory).filter((item) => item.source === "doT"), "暂无做T触发历史");
+    renderReminderHistoryItems(els.doTHistoryList, normalizeReminderHistory(state.reminderHistory).filter(isRedAlertHistoryItem), "暂无做T触发历史");
   }
 
   function openReminderModal(state, els, tab = "rules") {
@@ -1462,7 +1478,7 @@
   }
 
   function clearDoTHistory(state, els) {
-    state.reminderHistory = normalizeReminderHistory(state.reminderHistory).filter((item) => item.source !== "doT");
+    state.reminderHistory = normalizeReminderHistory(state.reminderHistory).filter(isCustomReminderHistoryItem);
     saveReminderHistory(root.localStorage, state.reminderHistory);
     renderReminderHistory(state, els);
     renderDoTHistory(state, els);
@@ -1536,7 +1552,7 @@
   }
 
   function clearReminderHistory(state, els) {
-    state.reminderHistory = normalizeReminderHistory(state.reminderHistory).filter((item) => item.source === "doT");
+    state.reminderHistory = normalizeReminderHistory(state.reminderHistory).filter(isRedAlertHistoryItem);
     saveReminderHistory(root.localStorage, state.reminderHistory);
     renderReminderHistory(state, els);
     renderDoTHistory(state, els);
@@ -1584,7 +1600,7 @@
     const viewButton = toast.querySelector("[data-view-reminders]");
     if (viewButton) {
       viewButton.addEventListener("click", () => {
-        if (item.source === "doT") openDoTModal(state, els);
+        if (isRedAlertHistoryItem(item)) openDoTModal(state, els);
         else openReminderModal(state, els, "history");
       });
     }
@@ -3465,6 +3481,7 @@
     currentWatchSymbolInputText,
     reminderToastClassName,
     reminderToastTitle,
+    isRedAlertHistoryItem,
     evaluateReminderRule,
     collectReminderTriggers,
     normalizeDoTItems,

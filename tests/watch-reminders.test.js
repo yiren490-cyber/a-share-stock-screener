@@ -42,6 +42,9 @@ assert.strictEqual(watch.reminderToastTitle({ source: "doT", name: "贵州茅台
 assert.strictEqual(watch.reminderToastTitle({ source: "currentRed", name: "贵州茅台" }), "贵州茅台 红灯做T提醒", "current watch red-light toast should use the unified red alert title");
 assert(watch.reminderToastClassName({ source: "doT" }).includes("is-red-alert"), "do-T red-light toast should use blue alert styling");
 assert(watch.reminderToastClassName({ source: "currentRed" }).includes("is-red-alert"), "current watch red-light toast should use blue alert styling");
+assert.strictEqual(watch.isRedAlertHistoryItem({ source: "doT" }), true, "do-T alerts should be grouped into do-T history");
+assert.strictEqual(watch.isRedAlertHistoryItem({ source: "currentRed" }), true, "current watch red-light alerts should be grouped into do-T history");
+assert.strictEqual(watch.isRedAlertHistoryItem({ source: "reminder" }), false, "custom stock-supervision reminders should stay out of do-T history");
 
 const normalized = watch.normalizeReminderRules([
   { symbol: "600519", conditionType: "priceAbove", targetPrice: "10.5" },
@@ -99,6 +102,18 @@ const doTFirst = watch.collectDoTTriggers(
 assert.strictEqual(doTFirst.triggered.length, 1, "do-T monitor should trigger when at least two red lights are active");
 assert.strictEqual(doTFirst.triggered[0].source, "doT");
 assert.strictEqual(doTFirst.triggered[0].conditionText, "1分钟 KDJ>80、5分钟 突破BOLL、日K 突破BOLL");
+const incompleteDoT = watch.collectDoTTriggers(
+  [{ id: "dt-incomplete", symbol: "sh600519", enabled: true }],
+  { sh600519: { symbol: "sh600519", name: "贵州茅台", latestPrice: 12 } },
+  {
+    "sh600519:m1": [],
+    "sh600519:m5": doTBollRows,
+    "sh600519:day": doTBollRows,
+  },
+  new Set(),
+  5500
+);
+assert.strictEqual(incompleteDoT.triggered.length, 0, "do-T monitor should not trigger while required red-light data is incomplete");
 const doTSecond = watch.collectDoTTriggers(
   [{ id: "dt1", symbol: "sh600519", enabled: true }],
   { sh600519: { symbol: "sh600519", name: "贵州茅台", latestPrice: 12 } },
